@@ -104,16 +104,11 @@ export const NotesProvider = ({ children }) => {
     }
 
     try {
-      // Find current note to toggle its pinned state
-      const currentNote = notes.find(n => n.id === parseInt(id));
-      if (!currentNote) return false;
-      
       setLoading(true);
-      const response = await axios.put(`${API_URL}/${id}`, {
-        ...currentNote,
-        pinned: !currentNote.pinned
-      });
+      // Use the dedicated endpoint with PATCH method instead of PUT with full update
+      const response = await axios.patch(`${API_URL}/${id}/toggle-pin`);
       
+      // Update the note in the state with the response data
       setNotes(prev => prev.map(n => n.id === parseInt(id) ? response.data : n));
       setError(null);
       return true;

@@ -81,5 +81,15 @@ public class NotesController {
         return new ResponseEntity<>(notes, HttpStatus.OK);
     }
 
+    @PatchMapping("/{id}/toggle-pin")
+    public ResponseEntity<Note> togglePinStatus(@PathVariable Long id) {
+        try {
+            Note updatedNote = notesService.togglePinStatus(id);
+            return new ResponseEntity<>(updatedNote, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
 
 }
