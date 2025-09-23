@@ -11,7 +11,10 @@ function EditNote() {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    category: 'Personal'
+
+    category: 'Personal',
+    pinned: false
+
   });
   const [loadingNote, setLoadingNote] = useState(true);
   const [loadingError, setLoadingError] = useState(null);
@@ -34,7 +37,10 @@ function EditNote() {
         setFormData({
           title: note.title,
           content: note.content,
-          category: note.category
+
+          category: note.category,
+          pinned: note.pinned || false
+
         });
         
         // Get unique categories from existing notes
@@ -120,7 +126,9 @@ function EditNote() {
         
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="p-8">
+
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Note</h1>
+
             
             <form onSubmit={handleSubmit}>
               <div className="mb-6">

@@ -62,6 +62,9 @@ export const NotesProvider = ({ children }) => {
         title: noteData.title,
         content: noteData.content,
         category: noteData.category,
+
+        pinned: noteData.pinned,
+
       });
       
       setNotes(prev => prev.map(n => n.id === parseInt(id) ? response.data : n));
