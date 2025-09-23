@@ -1,24 +1,24 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Menu, Star, Edit3, X, ChevronRight, Settings } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Menu, Star, ChevronRight, Settings, Edit3, X } from 'lucide-react';
 import NoteCard from '../Components/NoteCard';
-import NoteForm from '../Components/NoteForm';
 import DeleteConfirmationModal from '../Components/DeleteConfirmationModal';
-import { useNotes } from '../context/NotesContext';
+import { useNotes } from '../context/NotesContext.jsx';
 
-function Home() {
-  const { notes, loading, error, createNote, updateNote, deleteNote, togglePin, searchNotes } = useNotes();
+function NotesList() {
+  const navigate = useNavigate();
+  const { notes, togglePin, deleteNote } = useNotes();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All Notes');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [categories, setCategories] = useState(['All Notes']);
-  const [searchResults, setSearchResults] = useState(null);
 
-  // Handle responsive sidebar
+  const categories = useMemo(() => ['All Notes', 'Work', 'Personal', 'Ideas'], []);
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -32,34 +32,13 @@ function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Extract unique categories from notes
-  useEffect(() => {
-    if (notes && notes.length > 0) {
-      const uniqueCategories = [...new Set(notes.map(note => note.category))];
-      setCategories(['All Notes', ...uniqueCategories]);
-    }
-  }, [notes]);
-
-  // Handle search
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (searchTerm) {
-        searchNotes(searchTerm).then(results => {
-          setSearchResults(results);
-        });
-      } else {
-        setSearchResults(null);
-      }
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, searchNotes]);
-
-  const filteredNotes = searchResults || notes.filter(note => 
-    (activeCategory === 'All Notes' || note.category === activeCategory) &&
-    (note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-     note.content.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredNotes = useMemo(() => (
+    notes.filter(note => 
+      (activeCategory === 'All Notes' || note.category === activeCategory) &&
+      (note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+       note.content.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  ), [notes, activeCategory, searchTerm]);
 
   const pinnedNotes = filteredNotes.filter(note => note.pinned);
   const unpinnedNotes = filteredNotes.filter(note => !note.pinned);
@@ -72,45 +51,19 @@ function Home() {
     });
   };
 
-  const openCreateModal = () => {
-    setEditingNote(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (note) => {
-    setEditingNote(note);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingNote(null);
-  };
-
-  const handleSubmit = async (noteData) => {
-    if (noteData.title.trim() === '') return;
-    
-    if (editingNote) {
-      await updateNote(editingNote.id, noteData);
-    } else {
-      await createNote(noteData);
-    }
-    
-    closeModal();
-  };
-
   const confirmDelete = (id) => {
-    const note = notes.find(note => note.id === id);
+    const note = notes.find(n => n.id === id);
     if (note) {
       setNoteToDelete(note);
       setDeleteModalOpen(true);
     }
   };
 
-  const handleDeleteNote = async () => {
+  const handleDelete = () => {
     if (noteToDelete) {
-      await deleteNote(noteToDelete.id);
-      closeDeleteModal();
+      deleteNote(noteToDelete.id);
+      setNoteToDelete(null);
+      setDeleteModalOpen(false);
     }
   };
 
@@ -119,25 +72,19 @@ function Home() {
     setNoteToDelete(null);
   };
 
-  const handleTogglePin = async (id) => {
-    await togglePin(id);
-  };
-
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Mobile Overlay */}
       {isMobile && sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
+
       {/* Sidebar */}
       <div className={`${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } transform transition-transform duration-300 ease-in-out fixed md:relative bg-white h-full shadow-xl z-50 w-80 md:w-72 md:translate-x-0 border-r border-gray-200`}>
-        
         <div className="p-6 h-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
@@ -145,7 +92,7 @@ function Home() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                 <Edit3 size={20} className="text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">Saint Nabunturan Notes</h1>
+              <h1 className="text-xl font-bold text-gray-900">Notes</h1>
             </div>
             {isMobile && (
               <button 
@@ -156,16 +103,16 @@ function Home() {
               </button>
             )}
           </div>
-          
+
           {/* New Note Button */}
           <button 
-            onClick={openCreateModal}
+            onClick={() => navigate('/create')}
             className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl py-4 mb-8 flex items-center justify-center gap-2 hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl font-semibold"
           >
             <Plus size={20} />
             New Note
           </button>
-          
+
           {/* Categories */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 px-2">
@@ -206,8 +153,14 @@ function Home() {
               })}
             </div>
           </div>
-          
-          
+
+          {/* Settings */}
+          <div className="mt-auto pt-6 border-t border-gray-100">
+            <button className="w-full text-left py-3 px-4 rounded-xl flex items-center gap-3 hover:bg-gray-50 text-gray-600 transition-colors">
+              <Settings size={18} />
+              Settings
+            </button>
+          </div>
         </div>
       </div>
 
@@ -241,7 +194,7 @@ function Home() {
                 {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
               </div>
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white font-semibold text-sm">
-                UN
+                JD
               </div>
             </div>
           </div>
@@ -249,15 +202,7 @@ function Home() {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
-          ) : error ? (
-            <div className="flex items-center justify-center h-full text-red-500">
-              {error}
-            </div>
-          ) : filteredNotes.length === 0 ? (
+          {filteredNotes.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
                 <Edit3 size={32} className="text-gray-400" />
@@ -273,7 +218,7 @@ function Home() {
               </p>
               {!searchTerm && (
                 <button
-                  onClick={openCreateModal}
+                  onClick={() => navigate('/create')}
                   className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors flex items-center gap-2 font-semibold"
                 >
                   <Plus size={20} />
@@ -295,10 +240,11 @@ function Home() {
                       <NoteCard 
                         key={note.id} 
                         note={note} 
-                        onTogglePin={handleTogglePin}
-                        onEdit={openEditModal}
-                        onDelete={confirmDelete}
+                        onTogglePin={togglePin}
+                        onEdit={(n) => navigate(`/edit/${n.id}`)}
+                        onDelete={(id) => confirmDelete(id)}
                         formatDate={formatDate}
+                        onOpen={(n) => navigate(`/notes/${n.id}`)}
                       />
                     ))}
                   </div>
@@ -315,10 +261,11 @@ function Home() {
                     <NoteCard 
                       key={note.id} 
                       note={note} 
-                      onTogglePin={handleTogglePin}
-                      onEdit={openEditModal}
-                      onDelete={confirmDelete}
+                      onTogglePin={togglePin}
+                      onEdit={(n) => navigate(`/edit/${n.id}`)}
+                      onDelete={(id) => confirmDelete(id)}
                       formatDate={formatDate}
+                      onOpen={(n) => navigate(`/notes/${n.id}`)}
                     />
                   ))}
                 </div>
@@ -328,25 +275,17 @@ function Home() {
         </div>
       </div>
 
-      {/* Note Form Modal */}
-      <NoteForm 
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onSubmit={handleSubmit}
-        initialData={editingNote || { title: '', content: '', category: categories.length > 1 ? categories[1] : '' }}
-        categories={categories.filter(cat => cat !== 'All Notes')}
-        isEditing={!!editingNote}
-      />
-
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={deleteModalOpen}
         onClose={closeDeleteModal}
-        onConfirm={handleDeleteNote}
+        onConfirm={handleDelete}
         noteTitle={noteToDelete?.title || ''}
       />
     </div>
   );
 }
 
-export default Home;
+export default NotesList;
+
+

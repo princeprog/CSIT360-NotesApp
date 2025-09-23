@@ -5,6 +5,7 @@ import com.notesapp.nabunturan.Exception.NoteNotFoundException;
 import com.notesapp.nabunturan.Repository.NoteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -31,6 +32,8 @@ public class NotesService {
 
         note.setTitle(noteDetails.getTitle());
         note.setContent(noteDetails.getContent());
+        note.setPinned(noteDetails.isPinned());
+        note.setCategory(noteDetails.getCategory());
         return noteRepository.save(note);
     }
 
@@ -64,5 +67,13 @@ public class NotesService {
         if (!StringUtils.hasText(note.getContent())) {
             throw new IllegalArgumentException("Note content cannot be empty");
         }
+    }
+
+    @Transactional
+    public Note togglePinStatus(Long id) {
+        Note note = noteRepository.findById(id)
+                .orElseThrow(() -> new NoteNotFoundException(id));
+        note.setPinned(!note.isPinned());
+        return noteRepository.save(note);
     }
 }
