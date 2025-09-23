@@ -31,6 +31,8 @@ public class NotesService {
 
         note.setTitle(noteDetails.getTitle());
         note.setContent(noteDetails.getContent());
+        note.setPinned(noteDetails.isPinned());
+        note.setCategory(noteDetails.getCategory());
         return noteRepository.save(note);
     }
 

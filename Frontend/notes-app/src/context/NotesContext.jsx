@@ -1,82 +1,189 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 
+const API_URL = 'http://localhost:8080/api/notes';
 const NotesContext = createContext(null);
 
 export const NotesProvider = ({ children }) => {
-  const [notes, setNotes] = useState([
-    { 
-      id: 1, 
-      title: 'Project Planning', 
-      content: 'Review project requirements and create timeline for Q4 deliverables. Schedule team meetings and allocate resources accordingly.', 
-      category: 'Work', 
-      pinned: true, 
-      createdAt: new Date('2024-09-20'),
-      updatedAt: new Date('2024-09-20')
-    },
-    { 
-      id: 2, 
-      title: 'Shopping List', 
-      content: 'Weekly groceries: Organic vegetables, fresh fruits, whole grain bread, almond milk, Greek yogurt', 
-      category: 'Personal', 
-      pinned: false, 
-      createdAt: new Date('2024-09-19'),
-      updatedAt: new Date('2024-09-19')
-    },
-    { 
-      id: 3, 
-      title: 'Reading List', 
-      content: 'Books to read: "Atomic Habits" by James Clear, "The Design of Everyday Things" by Don Norman', 
-      category: 'Personal', 
-      pinned: false, 
-      createdAt: new Date('2024-09-18'),
-      updatedAt: new Date('2024-09-18')
-    },
-  ]);
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const createNote = (noteData) => {
-    const now = new Date();
-    const newNote = {
-      id: Date.now(),
-      title: noteData.title,
-      content: noteData.content,
-      category: noteData.category || 'Personal',
-      pinned: false,
-      createdAt: now,
-      updatedAt: now
+  // Fetch all notes on component mount
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(API_URL);
+        setNotes(response.data);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching notes:", err);
+        setError("Failed to fetch notes. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
     };
-    setNotes(prev => [newNote, ...prev]);
-    return newNote;
+
+    fetchNotes();
+  }, []);
+
+  const createNote = async (noteData) => {
+    try {
+      setLoading(true);
+      const response = await axios.post(API_URL, {
+        title: noteData.title,
+        content: noteData.content,
+        category: noteData.category || 'Personal',
+        pinned: false,
+      });
+      
+      setNotes(prev => [response.data, ...prev]);
+      setError(null);
+      return response.data;
+    } catch (err) {
+      console.error("Error creating note:", err);
+      setError("Failed to create note. Please try again later.");
+      return null;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateNote = (id, noteData) => {
-    const now = new Date();
-    setNotes(prev => prev.map(n => n.id === id ? {
-      ...n,
-      title: noteData.title,
-      content: noteData.content,
-      category: noteData.category || n.category,
-      updatedAt: now
-    } : n));
+  const updateNote = async (id, noteData) => {
+    if (!id || isNaN(parseInt(id))) {
+      setError("Invalid note ID");
+      return null;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.put(`${API_URL}/${id}`, {
+        title: noteData.title,
+        content: noteData.content,
+        category: noteData.category,
+      });
+      
+      setNotes(prev => prev.map(n => n.id === parseInt(id) ? response.data : n));
+      setError(null);
+      return response.data;
+    } catch (err) {
+      console.error("Error updating note:", err);
+      setError("Failed to update note. Please try again later.");
+      return null;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteNote = (id) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
+  const deleteNote = async (id) => {
+    if (!id || isNaN(parseInt(id))) {
+      setError("Invalid note ID");
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      await axios.delete(`${API_URL}/${id}`);
+      setNotes(prev => prev.filter(n => n.id !== parseInt(id)));
+      setError(null);
+      return true;
+    } catch (err) {
+      console.error("Error deleting note:", err);
+      setError("Failed to delete note. Please try again later.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const togglePin = (id) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
+  const togglePin = async (id) => {
+    if (!id || isNaN(parseInt(id))) {
+      setError("Invalid note ID");
+      return false;
+    }
+
+    try {
+      // Find current note to toggle its pinned state
+      const currentNote = notes.find(n => n.id === parseInt(id));
+      if (!currentNote) return false;
+      
+      setLoading(true);
+      const response = await axios.put(`${API_URL}/${id}`, {
+        ...currentNote,
+        pinned: !currentNote.pinned
+      });
+      
+      setNotes(prev => prev.map(n => n.id === parseInt(id) ? response.data : n));
+      setError(null);
+      return true;
+    } catch (err) {
+      console.error("Error toggling pin status:", err);
+      setError("Failed to update pin status. Please try again later.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getNoteById = (id) => notes.find(n => n.id === id);
+  const getNoteById = async (id) => {
+    // Validate ID before making API call
+    if (!id || isNaN(parseInt(id))) {
+      setError("Invalid note ID");
+      return null;
+    }
+    
+    const numericId = parseInt(id);
+    
+    // First check if we already have the note in state
+    const existingNote = notes.find(n => n.id === numericId);
+    if (existingNote) return existingNote;
+    
+    // If not, fetch it from the API
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/${numericId}`);
+      setError(null);
+      return response.data;
+    } catch (err) {
+      console.error(`Error fetching note with ID ${id}:`, err);
+      setError("Failed to fetch the note. Please try again later.");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const searchNotes = async (keyword) => {
+    if (!keyword || typeof keyword !== 'string') {
+      return notes; // Return all notes if no valid keyword
+    }
+    
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/search?keyword=${encodeURIComponent(keyword)}`);
+      setError(null);
+      return response.data;
+    } catch (err) {
+      console.error("Error searching notes:", err);
+      setError("Failed to search notes. Please try again later.");
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const value = useMemo(() => ({
     notes,
+    loading,
+    error,
     createNote,
     updateNote,
     deleteNote,
     togglePin,
     getNoteById,
-  }), [notes]);
+    searchNotes,
+  }), [notes, loading, error]);
 
   return (
     <NotesContext.Provider value={value}>
@@ -90,5 +197,3 @@ export const useNotes = () => {
   if (!ctx) throw new Error('useNotes must be used within NotesProvider');
   return ctx;
 };
-
-

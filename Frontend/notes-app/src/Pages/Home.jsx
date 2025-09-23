@@ -1,51 +1,24 @@
 import { useState, useEffect } from 'react';
+import { Search, Plus, Menu, Star, Edit3, X, ChevronRight, Settings } from 'lucide-react';
 import NoteCard from '../Components/NoteCard';
 import NoteForm from '../Components/NoteForm';
 import DeleteConfirmationModal from '../Components/DeleteConfirmationModal';
-import { Search, Plus, Menu, Star, Trash2, Edit3, X, ChevronRight, Settings, Save } from 'lucide-react';
+import { useNotes } from '../context/NotesContext';
 
 function Home() {
+  const { notes, loading, error, createNote, updateNote, deleteNote, togglePin, searchNotes } = useNotes();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All Notes');
-  const [notes, setNotes] = useState([
-    { 
-      id: 1, 
-      title: 'Project Planning', 
-      content: 'Review project requirements and create timeline for Q4 deliverables. Schedule team meetings and allocate resources accordingly.', 
-      category: 'Work', 
-      pinned: true, 
-      createdAt: new Date('2024-09-20'),
-      updatedAt: new Date('2024-09-20')
-    },
-    { 
-      id: 2, 
-      title: 'Shopping List', 
-      content: 'Weekly groceries: Organic vegetables, fresh fruits, whole grain bread, almond milk, Greek yogurt', 
-      category: 'Personal', 
-      pinned: false, 
-      createdAt: new Date('2024-09-19'),
-      updatedAt: new Date('2024-09-19')
-    },
-    { 
-      id: 3, 
-      title: 'Reading List', 
-      content: 'Books to read: "Atomic Habits" by James Clear, "The Design of Everyday Things" by Don Norman', 
-      category: 'Personal', 
-      pinned: false, 
-      createdAt: new Date('2024-09-18'),
-      updatedAt: new Date('2024-09-18')
-    },
-  ]);
-
-  const categories = ['All Notes', 'Work', 'Personal', 'Ideas'];
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState(null);
-  // NoteForm manages its own form data
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [categories, setCategories] = useState(['All Notes']);
+  const [searchResults, setSearchResults] = useState(null);
 
+  // Handle responsive sidebar
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -59,7 +32,30 @@ function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const filteredNotes = notes.filter(note => 
+  // Extract unique categories from notes
+  useEffect(() => {
+    if (notes && notes.length > 0) {
+      const uniqueCategories = [...new Set(notes.map(note => note.category))];
+      setCategories(['All Notes', ...uniqueCategories]);
+    }
+  }, [notes]);
+
+  // Handle search
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchTerm) {
+        searchNotes(searchTerm).then(results => {
+          setSearchResults(results);
+        });
+      } else {
+        setSearchResults(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, searchNotes]);
+
+  const filteredNotes = searchResults || notes.filter(note => 
     (activeCategory === 'All Notes' || note.category === activeCategory) &&
     (note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
      note.content.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -91,36 +87,13 @@ function Home() {
     setEditingNote(null);
   };
 
-  const handleSubmit = (noteData) => {
+  const handleSubmit = async (noteData) => {
     if (noteData.title.trim() === '') return;
     
-    const now = new Date();
-    
     if (editingNote) {
-      // Update existing note
-      setNotes(notes.map(note => 
-        note.id === editingNote.id 
-          ? { 
-              ...note, 
-              title: noteData.title,
-              content: noteData.content,
-              category: noteData.category,
-              updatedAt: now
-            }
-          : note
-      ));
+      await updateNote(editingNote.id, noteData);
     } else {
-      // Create new note
-      const newNote = {
-        id: Date.now(),
-        title: noteData.title,
-        content: noteData.content,
-        category: noteData.category,
-        pinned: false,
-        createdAt: now,
-        updatedAt: now
-      };
-      setNotes([newNote, ...notes]);
+      await createNote(noteData);
     }
     
     closeModal();
@@ -134,11 +107,10 @@ function Home() {
     }
   };
 
-  const deleteNote = () => {
+  const handleDeleteNote = async () => {
     if (noteToDelete) {
-      setNotes(notes.filter(note => note.id !== noteToDelete.id));
-      setNoteToDelete(null);
-      setDeleteModalOpen(false);
+      await deleteNote(noteToDelete.id);
+      closeDeleteModal();
     }
   };
 
@@ -147,13 +119,9 @@ function Home() {
     setNoteToDelete(null);
   };
 
-  const togglePin = (id) => {
-    setNotes(notes.map(note => 
-      note.id === id ? { ...note, pinned: !note.pinned } : note
-    ));
+  const handleTogglePin = async (id) => {
+    await togglePin(id);
   };
-
-  // NoteCard component has been moved to its own file
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -279,7 +247,7 @@ function Home() {
                 {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
               </div>
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white font-semibold text-sm">
-                JD
+                UN
               </div>
             </div>
           </div>
@@ -287,7 +255,15 @@ function Home() {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {filteredNotes.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-full text-red-500">
+              {error}
+            </div>
+          ) : filteredNotes.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
                 <Edit3 size={32} className="text-gray-400" />
@@ -325,7 +301,7 @@ function Home() {
                       <NoteCard 
                         key={note.id} 
                         note={note} 
-                        onTogglePin={togglePin}
+                        onTogglePin={handleTogglePin}
                         onEdit={openEditModal}
                         onDelete={confirmDelete}
                         formatDate={formatDate}
@@ -345,7 +321,7 @@ function Home() {
                     <NoteCard 
                       key={note.id} 
                       note={note} 
-                      onTogglePin={togglePin}
+                      onTogglePin={handleTogglePin}
                       onEdit={openEditModal}
                       onDelete={confirmDelete}
                       formatDate={formatDate}
@@ -363,7 +339,7 @@ function Home() {
         isOpen={isModalOpen}
         onClose={closeModal}
         onSubmit={handleSubmit}
-        initialData={editingNote || { title: '', content: '', category: 'Personal' }}
+        initialData={editingNote || { title: '', content: '', category: categories.length > 1 ? categories[1] : '' }}
         categories={categories.filter(cat => cat !== 'All Notes')}
         isEditing={!!editingNote}
       />
@@ -372,7 +348,7 @@ function Home() {
       <DeleteConfirmationModal
         isOpen={deleteModalOpen}
         onClose={closeDeleteModal}
-        onConfirm={deleteNote}
+        onConfirm={handleDeleteNote}
         noteTitle={noteToDelete?.title || ''}
       />
     </div>

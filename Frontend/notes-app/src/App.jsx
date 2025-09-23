@@ -12,7 +12,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Navigate to="/notes" replace />} />
-          <Route path="/notes" element={<NotesList />} />
+          <Route path="/notes" element={<Home />} />
           <Route path="/notes/:id" element={<NoteView />} />
           <Route path="/create" element={<CreateNote />} />
           <Route path="/edit/:id" element={<EditNote />} />
