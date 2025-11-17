@@ -215,12 +215,20 @@ public interface BlockchainTransactionRepository extends JpaRepository<Blockchai
     /**
      * Find all transactions indexed within a specific time range.
      * Useful for monitoring indexer performance.
-     * 
+     *
      * @param startTime Starting indexed time
      * @param endTime Ending indexed time
      * @return List of blockchain transactions
      */
     @Query("SELECT bt FROM BlockchainTransaction bt WHERE bt.indexedAt >= :startTime AND bt.indexedAt <= :endTime ORDER BY bt.indexedAt DESC")
     List<BlockchainTransaction> findByIndexedAtBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * Find the most recent blockchain transaction by block height.
+     * Useful for resuming indexing from the last indexed block.
+     *
+     * @return Optional containing the most recent transaction if found
+     */
+    Optional<BlockchainTransaction> findTopByOrderByBlockHeightDesc();
 }
 

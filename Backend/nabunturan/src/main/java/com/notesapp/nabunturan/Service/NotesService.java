@@ -28,7 +28,7 @@ public class NotesService {
     public Note updateNote(Long id, Note noteDetails) {
         validateNote(noteDetails);
         Note note = noteRepository.findById(id)
-                .orElseThrow(() -> new NoteNotFoundException(id));
+                .orElseThrow(() -> NoteNotFoundException.byId(id));
 
         note.setTitle(noteDetails.getTitle());
         note.setContent(noteDetails.getContent());
@@ -39,7 +39,7 @@ public class NotesService {
 
     public Note getNoteById(Long id) {
         return noteRepository.findById(id)
-                .orElseThrow(() -> new NoteNotFoundException(id));
+                .orElseThrow(() -> NoteNotFoundException.byId(id));
     }
 
     public List<Note> getAllNotes() {
@@ -48,7 +48,7 @@ public class NotesService {
 
     public void deleteNote(Long id) {
         if (!noteRepository.existsById(id)) {
-            throw new NoteNotFoundException(id);
+            throw NoteNotFoundException.byId(id);
         }
         noteRepository.deleteById(id);
     }
@@ -72,7 +72,7 @@ public class NotesService {
     @Transactional
     public Note togglePinStatus(Long id) {
         Note note = noteRepository.findById(id)
-                .orElseThrow(() -> new NoteNotFoundException(id));
+                .orElseThrow(() -> NoteNotFoundException.byId(id));
         note.setPinned(!note.isPinned());
         return noteRepository.save(note);
     }
