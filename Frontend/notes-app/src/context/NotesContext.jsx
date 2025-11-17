@@ -10,6 +10,43 @@ export const NotesProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Helper function to sign and submit a transaction
+  const signAndSubmitTransaction = async (builtTx, walletApi) => {
+    if (!builtTx || !walletApi) {
+      throw new Error("Built transaction and wallet API are required");
+    }
+
+    try {
+      // Get the transaction CBOR
+      const txCbor = builtTx.toCbor();
+      console.log("Transaction CBOR to sign:", txCbor);
+
+      // Sign the transaction using the wallet API
+      console.log("Requesting wallet to sign transaction...");
+      const witnessSet = await walletApi.signTx(txCbor, true);
+      console.log("Transaction signed. Witness set:", witnessSet);
+
+      // Assemble the signed transaction
+      const signedTx = Core.Transaction.fromCbor(Core.HexBlob(txCbor));
+      const witnesses = Core.TransactionWitnessSet.fromCbor(Core.HexBlob(witnessSet));
+      
+      // Combine the transaction with witnesses
+      signedTx.setWitnessSet(witnesses);
+      const signedTxCbor = signedTx.toCbor();
+      console.log("Signed transaction CBOR:", signedTxCbor);
+
+      // Submit the signed transaction to the network
+      console.log("Submitting transaction to Cardano network...");
+      const txHash = await walletApi.submitTx(signedTxCbor);
+      console.log("Transaction submitted successfully! TxHash:", txHash);
+
+      return { success: true, txHash };
+    } catch (err) {
+      console.error("Error signing/submitting transaction:", err);
+      throw err;
+    }
+  };
+
   // Fetch all notes on component mount
   useEffect(() => {
     const fetchNotes = async () => {
@@ -109,8 +146,14 @@ export const NotesProvider = ({ children }) => {
           const txCbor = builtTx.toCbor();
           console.log("Built transaction CBOR (from createNote):", txCbor);
           console.log("Metadata attached/used for tx build:", metadata);
+
+          // Sign and submit the transaction
+          const result = await signAndSubmitTransaction(builtTx, api);
+          if (result.success) {
+            console.log(`CREATE transaction submitted successfully! TxHash: ${result.txHash}`);
+          }
         } catch (err) {
-          console.warn("Error building transaction for note:", err);
+          console.warn("Error building/submitting transaction for note:", err);
         }
       };
 
@@ -210,8 +253,14 @@ export const NotesProvider = ({ children }) => {
           const txCbor = builtTx.toCbor();
           console.log("Built UPDATE transaction CBOR (from updateNote):", txCbor);
           console.log("Update metadata used for tx build:", metadata);
+
+          // Sign and submit the transaction
+          const result = await signAndSubmitTransaction(builtTx, api);
+          if (result.success) {
+            console.log(`UPDATE transaction submitted successfully! TxHash: ${result.txHash}`);
+          }
         } catch (err) {
-          console.warn("Error building UPDATE transaction for note:", err);
+          console.warn("Error building/submitting UPDATE transaction for note:", err);
         }
       };
 
@@ -307,8 +356,14 @@ export const NotesProvider = ({ children }) => {
           const txCbor = builtTx.toCbor();
           console.log("Built DELETE transaction CBOR (from deleteNote):", txCbor);
           console.log("Delete metadata used for tx build:", metadata);
+
+          // Sign and submit the transaction
+          const result = await signAndSubmitTransaction(builtTx, api);
+          if (result.success) {
+            console.log(`DELETE transaction submitted successfully! TxHash: ${result.txHash}`);
+          }
         } catch (err) {
-          console.warn("Error building DELETE transaction for note:", err);
+          console.warn("Error building/submitting DELETE transaction for note:", err);
         }
       };
 

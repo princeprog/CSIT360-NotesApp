@@ -67,6 +67,43 @@ export default function WalletConnect() {
     return bytes;
   };
 
+  // Helper function to sign and submit a transaction
+  const signAndSubmitTransaction = async (builtTx, walletApiToUse) => {
+    if (!builtTx || !walletApiToUse) {
+      throw new Error("Built transaction and wallet API are required");
+    }
+
+    try {
+      // Get the transaction CBOR
+      const txCbor = builtTx.toCbor();
+      console.log("Transaction CBOR to sign:", txCbor);
+
+      // Sign the transaction using the wallet API
+      console.log("Requesting wallet to sign transaction...");
+      const witnessSet = await walletApiToUse.signTx(txCbor, true);
+      console.log("Transaction signed. Witness set:", witnessSet);
+
+      // Assemble the signed transaction
+      const signedTx = Core.Transaction.fromCbor(Core.HexBlob(txCbor));
+      const witnesses = Core.TransactionWitnessSet.fromCbor(Core.HexBlob(witnessSet));
+      
+      // Combine the transaction with witnesses
+      signedTx.setWitnessSet(witnesses);
+      const signedTxCbor = signedTx.toCbor();
+      console.log("Signed transaction CBOR:", signedTxCbor);
+
+      // Submit the signed transaction to the network
+      console.log("Submitting transaction to Cardano network...");
+      const txHash = await walletApiToUse.submitTx(signedTxCbor);
+      console.log("Transaction submitted successfully! TxHash:", txHash);
+
+      return { success: true, txHash };
+    } catch (err) {
+      console.error("Error signing/submitting transaction:", err);
+      throw err;
+    }
+  };
+
   const handleSubmitTransaction = async () => {
     // prefer the address obtained from the enabled API; fall back to context walletAddress
     const addrSource = localWalletAddress || walletAddress;
@@ -192,7 +229,7 @@ export default function WalletConnect() {
         return;
       }
 
-      // Provide the CBOR and metadata (if fallback) to the user / console for later sign & submit
+      // Sign and submit the transaction
       try {
         const txCbor = builtTx.toCbor();
         console.log("Transaction built (CBOR):", txCbor);
@@ -200,11 +237,17 @@ export default function WalletConnect() {
           console.log("Transaction metadata (fallback - attach when signing/submitting):", metadataFallback);
         }
 
+        // Sign and submit the transaction
+        const result = await signAndSubmitTransaction(builtTx, walletApi);
         
+        if (result.success) {
+          setSendSuccess(`Transaction submitted successfully! TxHash: ${result.txHash}`);
+          console.log("Transaction hash:", result.txHash);
+        }
       
       } catch (err) {
-        console.warn("Could not serialize built transaction:", err);
-        setSendError("Transaction built but failed to serialize CBOR. See console.");
+        console.error("Error signing/submitting transaction:", err);
+        setSendError(err?.message || "Failed to sign/submit transaction. See console.");
       }
 
     } catch (error) {
@@ -333,7 +376,13 @@ export default function WalletConnect() {
       console.log("Built transaction CBOR (from note):", txCbor);
       console.log("Attached metadata:", metadata);
 
-      setSendSuccess(`Transaction built for note ${note.id}. CBOR logged to console.`);
+      // Sign and submit the transaction
+      const result = await signAndSubmitTransaction(builtTx, apiToUse);
+      
+      if (result.success) {
+        setSendSuccess(`Transaction for note ${note.id} submitted successfully! TxHash: ${result.txHash}`);
+        console.log("Transaction hash:", result.txHash);
+      }
     } catch (err) {
       console.error("Error building transaction from note:", err);
       setSendError(err?.message || "Failed to build transaction from note.");
@@ -425,10 +474,10 @@ export default function WalletConnect() {
             {isSending ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                Building...
+                Processing...
               </>
             ) : (
-              "Build Transaction"
+              "Build, Sign & Submit Transaction"
             )}
           </button>
         </div>
