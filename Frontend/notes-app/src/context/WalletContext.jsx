@@ -44,6 +44,7 @@ export const WalletProvider = ({ children }) => {
             }
 
             const api = await window.cardano[walletName].enable();
+            console.log('Connected to API:', api);
             setWalletApi(api);
             setSelectedWallet(walletName);
 
@@ -76,6 +77,37 @@ export const WalletProvider = ({ children }) => {
         localStorage.removeItem("connectedWallet");
     }
 
+    // Normalize UTXO output across different wallet implementations (Eternl returns CBOR hex strings)
+    const readUtxos = async () => {
+        if (!walletApi) {
+            const err = new Error("No wallet connected");
+            setError(err.message);
+            throw err;
+        }
+
+        try {
+            // Most CIP-30 wallets expose getUtxos()
+            const raw = await walletApi.getUtxos?.();
+
+            if (!raw) return [];
+
+            // If Eternl (and some wallets) return CBOR hex strings, convert to objects for easier UI use:
+            if (Array.isArray(raw) && raw.every(item => typeof item === "string")) {
+                return raw.map(cborHex => ({ cbor: cborHex }));
+            }
+
+            // If wallet already returns structured objects, return as-is
+            if (Array.isArray(raw)) return raw;
+
+            // Fallback: wrap single value
+            return [{ utxo: raw }];
+        } catch (err) {
+            console.error("Error reading UTXOs:", err);
+            setError("Failed to read UTXOs from wallet");
+            throw err;
+        }
+    };
+
     useEffect(() => {
         const reconnect = async () => {
             const lastConnected = localStorage.getItem("connectedWallet");
@@ -98,6 +130,7 @@ export const WalletProvider = ({ children }) => {
                 connectWallet,
                 disconnectWallet,
                 isConnected: !!walletApi,
+                readUtxos,
             }}
         >
             {children}

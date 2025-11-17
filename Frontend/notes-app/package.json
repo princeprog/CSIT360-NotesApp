@@ -10,12 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@blaze-cardano/sdk": "^0.2.44",
+    "@emurgo/cardano-serialization-lib-browser": "^15.0.3",
     "axios": "^1.13.2",
     "lucide-react": "^0.544.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-icons": "^5.5.0",
-    "react-router-dom": "^7.9.1"
+    "react-router-dom": "^7.9.1",
+    "vite-plugin-node-polyfills": "^0.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
