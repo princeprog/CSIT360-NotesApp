@@ -43,7 +43,50 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle BlockchainIndexException
+     * Thrown when blockchain indexing operations fail
+     */
+    @ExceptionHandler(BlockchainIndexException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBlockchainIndexException(BlockchainIndexException ex) {
+        return errorResponseEntity("Blockchain indexing error: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Handle TransactionNotFoundException
+     * Thrown when a requested blockchain transaction is not found
+     */
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleTransactionNotFoundException(TransactionNotFoundException ex) {
+        return errorResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Handle BlockfrostApiException
+     * Thrown when Blockfrost API calls fail
+     */
+    @ExceptionHandler(BlockfrostApiException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBlockfrostApiException(BlockfrostApiException ex) {
+        // Determine appropriate HTTP status based on exception details
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+        
+        if (ex.getStatusCode() != null) {
+            // Map Blockfrost status codes to appropriate HTTP status
+            switch (ex.getStatusCode()) {
+                case 400 -> status = HttpStatus.BAD_REQUEST;
+                case 401, 403 -> status = HttpStatus.UNAUTHORIZED;
+                case 404 -> status = HttpStatus.NOT_FOUND;
+                case 429 -> status = HttpStatus.TOO_MANY_REQUESTS;
+                case 500, 502, 503, 504 -> status = HttpStatus.SERVICE_UNAVAILABLE;
+                default -> status = HttpStatus.INTERNAL_SERVER_ERROR;
+            }
+        }
+        
+        return errorResponseEntity("Blockchain API error: " + ex.getMessage(), status);
+    }
+
+    /**
      * Handle generic Exception
+     * Catches all other unexpected exceptions
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
