@@ -1,15 +1,20 @@
 package com.notesapp.nabunturan.Entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -39,6 +44,18 @@ public class Note {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "created_by_wallet", length = 150)
+    private String createdByWallet;
+
+    @Column(name = "on_chain", nullable = false)
+    private Boolean onChain = false;
+
+    @Column(name = "latest_tx_hash", length = 64)
+    private String latestTxHash;
+
+    @OneToMany(mappedBy = "note", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<BlockchainTransaction> blockchainTransactions = new ArrayList<>();
 
     public Note() {}
 
@@ -105,6 +122,50 @@ public class Note {
         this.updatedAt = updatedAt;
     }
 
+    public String getCreatedByWallet() {
+        return createdByWallet;
+    }
+
+    public void setCreatedByWallet(String createdByWallet) {
+        this.createdByWallet = createdByWallet;
+    }
+
+    public Boolean getOnChain() {
+        return onChain;
+    }
+
+    public void setOnChain(Boolean onChain) {
+        this.onChain = onChain;
+    }
+
+    public String getLatestTxHash() {
+        return latestTxHash;
+    }
+
+    public void setLatestTxHash(String latestTxHash) {
+        this.latestTxHash = latestTxHash;
+    }
+
+    public List<BlockchainTransaction> getBlockchainTransactions() {
+        return blockchainTransactions;
+    }
+
+    public void setBlockchainTransactions(List<BlockchainTransaction> blockchainTransactions) {
+        this.blockchainTransactions = blockchainTransactions;
+    }
+
+    // Helper method to add a blockchain transaction
+    public void addBlockchainTransaction(BlockchainTransaction transaction) {
+        blockchainTransactions.add(transaction);
+        transaction.setNote(this);
+    }
+
+    // Helper method to remove a blockchain transaction
+    public void removeBlockchainTransaction(BlockchainTransaction transaction) {
+        blockchainTransactions.remove(transaction);
+        transaction.setNote(null);
+    }
+
     @Override
     public String toString() {
         return "Note{" +
@@ -112,6 +173,9 @@ public class Note {
                 ", title='" + title + '\'' +
                 ", content='" + content + '\'' +
                 ", category='" + category + '\'' +
+                ", onChain=" + onChain +
+                ", createdByWallet='" + createdByWallet + '\'' +
+                ", latestTxHash='" + latestTxHash + '\'' +
                 ", createdAt=" + createdAt +
                 ", updatedAt=" + updatedAt +
                 '}';
