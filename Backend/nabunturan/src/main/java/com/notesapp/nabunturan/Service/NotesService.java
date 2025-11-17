@@ -57,6 +57,32 @@ public class NotesService {
         return noteRepository.findByTitleOrContentContainingIgnoreCase(keyword);
     }
 
+    /**
+     * Get all notes created by a specific wallet address
+     * 
+     * @param walletAddress Cardano wallet address
+     * @return List of notes created by this wallet
+     */
+    public List<Note> getNotesByWalletAddress(String walletAddress) {
+        if (walletAddress == null || walletAddress.isBlank()) {
+            throw new IllegalArgumentException("Wallet address cannot be empty");
+        }
+        return noteRepository.findByWalletAddress(walletAddress);
+    }
+
+    /**
+     * Get all on-chain notes created by a specific wallet address
+     * 
+     * @param walletAddress Cardano wallet address
+     * @return List of on-chain notes created by this wallet
+     */
+    public List<Note> getOnChainNotesByWalletAddress(String walletAddress) {
+        if (walletAddress == null || walletAddress.isBlank()) {
+            throw new IllegalArgumentException("Wallet address cannot be empty");
+        }
+        return noteRepository.findByWalletAddressAndOnChainStatus(walletAddress, true);
+    }
+
     private void validateNote(Note note) {
         if (note == null) {
             throw new IllegalArgumentException("Note cannot be null");

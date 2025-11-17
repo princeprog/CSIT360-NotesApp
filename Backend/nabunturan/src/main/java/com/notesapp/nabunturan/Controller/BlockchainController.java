@@ -1,8 +1,10 @@
 package com.notesapp.nabunturan.Controller;
 
 import com.notesapp.nabunturan.DTO.BlockchainTransactionDto;
+import com.notesapp.nabunturan.DTO.CreatePendingTransactionRequest;
 import com.notesapp.nabunturan.DTO.DtoMapper;
 import com.notesapp.nabunturan.DTO.IndexerStatusDto;
+import com.notesapp.nabunturan.DTO.SubmitTransactionRequest;
 import com.notesapp.nabunturan.Entity.BlockchainTransaction;
 import com.notesapp.nabunturan.Entity.TransactionStatus;
 import com.notesapp.nabunturan.Repository.BlockchainTransactionRepository;
@@ -410,6 +412,117 @@ public class BlockchainController {
             logger.error("Error checking transaction existence for {}: {}", txHash, e.getMessage(), e);
             return new ResponseEntity<>(
                     ApiResponse.error("Failed to check transaction existence: " + e.getMessage()),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    // ========== PENDING TRANSACTION MANAGEMENT ENDPOINTS ==========
+
+    /**
+     * Create a pending blockchain transaction.
+     * POST /api/blockchain/transactions/pending
+     * 
+     * Used by YONG after building transaction but before blockchain submission.
+     * Saves transaction with status=PENDING for tracking.
+     * 
+     * Workflow:
+     * 1. Frontend (YONG) builds transaction with Cardano metadata
+     * 2. Calls this endpoint to save pending transaction
+     * 3. Gets back transaction ID for tracking
+     * 4. IVAN signs and submits to blockchain
+     * 5. IVAN calls updateTransaction Submit with txHash
+     * 
+     * @param request CreatePendingTransactionRequest with transaction details
+     * @return ApiResponse with created BlockchainTransactionDto
+     */
+    @PostMapping("/transactions/pending")
+    public ResponseEntity<ApiResponse<BlockchainTransactionDto>> createPendingTransaction(
+            @RequestBody CreatePendingTransactionRequest request) {
+        try {
+            logger.info("Creating pending transaction for note {} by wallet {}", 
+                        request.noteId(), request.walletAddress());
+            
+            BlockchainTransactionDto transaction = 
+                blockchainIndexerService.createPendingTransaction(request);
+            
+            logger.info("Pending transaction created with ID: {}", transaction.id());
+            
+            return new ResponseEntity<>(
+                    ApiResponse.success(
+                            "Pending transaction created successfully. Transaction ID: " + transaction.id(),
+                            transaction
+                    ),
+                    HttpStatus.CREATED
+            );
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid pending transaction request: {}", e.getMessage());
+            return new ResponseEntity<>(
+                    ApiResponse.error("Invalid request: " + e.getMessage()),
+                    HttpStatus.BAD_REQUEST
+            );
+        } catch (Exception e) {
+            logger.error("Error creating pending transaction: {}", e.getMessage(), e);
+            return new ResponseEntity<>(
+                    ApiResponse.error("Failed to create pending transaction: " + e.getMessage()),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * Update transaction after blockchain submission.
+     * PUT /api/blockchain/transactions/{id}/submit
+     * 
+     * Called by IVAN after successfully signing and submitting transaction to Cardano.
+     * Updates transaction with blockchain hash and changes status to MEMPOOL.
+     * 
+     * Workflow:
+     * 1. IVAN signs pending transaction with Lace wallet
+     * 2. IVAN submits signed transaction to Cardano network
+     * 3. IVAN receives txHash from blockchain
+     * 4. IVAN calls this endpoint with txHash
+     * 5. Backend updates transaction status and note's latestTxHash
+     * 
+     * @param id Internal transaction ID (from createPendingTransaction)
+     * @param request Request body with txHash
+     * @return ApiResponse with updated BlockchainTransactionDto
+     */
+    @PutMapping("/transactions/{id}/submit")
+    public ResponseEntity<ApiResponse<BlockchainTransactionDto>> submitTransaction(
+            @PathVariable Long id,
+            @RequestBody SubmitTransactionRequest request) {
+        try {
+            logger.info("Updating transaction {} with blockchain hash {}", id, request.txHash());
+            
+            BlockchainTransactionDto transaction = 
+                blockchainIndexerService.updateTransactionSubmitted(id, request.txHash());
+            
+            logger.info("Transaction {} submitted successfully to blockchain", id);
+            
+            return new ResponseEntity<>(
+                    ApiResponse.success(
+                            "Transaction submitted successfully. TxHash: " + request.txHash(),
+                            transaction
+                    ),
+                    HttpStatus.OK
+            );
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid submit transaction request: {}", e.getMessage());
+            return new ResponseEntity<>(
+                    ApiResponse.error("Invalid request: " + e.getMessage()),
+                    HttpStatus.BAD_REQUEST
+            );
+        } catch (IllegalStateException e) {
+            logger.error("Invalid transaction state: {}", e.getMessage());
+            return new ResponseEntity<>(
+                    ApiResponse.error(e.getMessage()),
+                    HttpStatus.CONFLICT
+            );
+        } catch (Exception e) {
+            logger.error("Error submitting transaction {}: {}", id, e.getMessage(), e);
+            return new ResponseEntity<>(
+                    ApiResponse.error("Failed to submit transaction: " + e.getMessage()),
                     HttpStatus.INTERNAL_SERVER_ERROR
             );
         }

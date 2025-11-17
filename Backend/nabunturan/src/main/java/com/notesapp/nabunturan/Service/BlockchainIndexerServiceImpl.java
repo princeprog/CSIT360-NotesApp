@@ -619,5 +619,163 @@ public class BlockchainIndexerServiceImpl implements BlockchainIndexerService {
         List<BlockchainTransaction> transactions = blockchainTransactionRepository.findByNoteId(noteId);
         return DtoMapper.toBlockchainTransactionDtoList(transactions);
     }
+
+    // ========== PENDING TRANSACTION MANAGEMENT IMPLEMENTATIONS ==========
+
+    @Override
+    @Transactional
+    public BlockchainTransactionDto createPendingTransaction(CreatePendingTransactionRequest request) {
+        logger.info("Creating pending transaction for note {} with type {}", 
+                    request.noteId(), request.type());
+        
+        // Validate note exists
+        Note note = noteRepository.findById(request.noteId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Note with ID " + request.noteId() + " not found"));
+        
+        // Create transaction entity
+        BlockchainTransaction transaction = new BlockchainTransaction();
+        transaction.setNote(note);
+        transaction.setType(TransactionType.valueOf(request.type()));
+        transaction.setStatus(TransactionStatus.PENDING);
+        transaction.setWalletAddress(request.walletAddress());
+        transaction.setMetadata(request.metadata());
+        
+        // Set temporary values (will be updated when submitted to blockchain)
+        transaction.setTxHash("pending_" + System.currentTimeMillis()); // Temporary hash
+        transaction.setBlockHeight(0L);  // Not yet on blockchain
+        transaction.setBlockTime(LocalDateTime.now());
+        transaction.setConfirmations(0);
+        
+        // Save to database
+        BlockchainTransaction saved = blockchainTransactionRepository.save(transaction);
+        
+        logger.info("Pending transaction created with ID: {} for note: {}", 
+                    saved.getId(), note.getId());
+        
+        return DtoMapper.toBlockchainTransactionDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public BlockchainTransactionDto updateTransactionSubmitted(Long transactionId, String txHash) {
+        logger.info("Updating transaction {} with blockchain hash {}", transactionId, txHash);
+        
+        // Validate inputs
+        if (txHash == null || txHash.isBlank()) {
+            throw new IllegalArgumentException("Transaction hash cannot be empty");
+        }
+        if (txHash.length() != 64) {
+            throw new IllegalArgumentException("Invalid transaction hash format (must be 64 hex characters)");
+        }
+        
+        // Find transaction
+        BlockchainTransaction transaction = blockchainTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Transaction with ID " + transactionId + " not found"));
+        
+        // Validate current status
+        if (transaction.getStatus() != TransactionStatus.PENDING) {
+            throw new IllegalStateException(
+                "Can only update transactions with PENDING status. Current status: " + 
+                transaction.getStatus());
+        }
+        
+        // Check if txHash already exists
+        if (blockchainTransactionRepository.existsByTxHash(txHash)) {
+            throw new IllegalStateException("Transaction hash already exists: " + txHash);
+        }
+        
+        // Update transaction
+        transaction.setTxHash(txHash);
+        transaction.setStatus(TransactionStatus.MEMPOOL);
+        transaction.setBlockTime(LocalDateTime.now());
+        
+        // Update note's latest tx hash
+        if (transaction.getNote() != null) {
+            Note note = transaction.getNote();
+            note.setLatestTxHash(txHash);
+            note.setOnChain(true); // Mark as on-chain
+            noteRepository.save(note);
+            logger.info("Updated note {} with latest txHash: {}", note.getId(), txHash);
+        }
+        
+        // Save updated transaction
+        BlockchainTransaction updated = blockchainTransactionRepository.save(transaction);
+        
+        logger.info("Transaction {} successfully submitted to blockchain with hash: {}", 
+                    transactionId, txHash);
+        
+        return DtoMapper.toBlockchainTransactionDto(updated);
+    }
+
+    @Override
+    @Transactional
+    public BlockchainTransactionDto updateTransactionFailed(Long transactionId, String errorMessage) {
+        logger.info("Marking transaction {} as failed. Reason: {}", transactionId, errorMessage);
+        
+        // Validate inputs
+        if (errorMessage == null || errorMessage.isBlank()) {
+            throw new IllegalArgumentException("Error message cannot be empty");
+        }
+        
+        // Find transaction
+        BlockchainTransaction transaction = blockchainTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Transaction with ID " + transactionId + " not found"));
+        
+        // Validate current status
+        if (transaction.getStatus() == TransactionStatus.CONFIRMED) {
+            throw new IllegalStateException(
+                "Cannot mark confirmed transaction as failed");
+        }
+        
+        // Update transaction status
+        transaction.setStatus(TransactionStatus.FAILED);
+        
+        // Store error message in metadata
+        String currentMetadata = transaction.getMetadata() != null ? 
+            transaction.getMetadata() : "{}";
+        String errorMetadata = currentMetadata.substring(0, currentMetadata.length() - 1) + 
+            ", \"error\": \"" + errorMessage.replace("\"", "\\\"") + "\"}";
+        transaction.setMetadata(errorMetadata);
+        
+        // Save updated transaction
+        BlockchainTransaction updated = blockchainTransactionRepository.save(transaction);
+        
+        logger.info("Transaction {} marked as FAILED", transactionId);
+        
+        return DtoMapper.toBlockchainTransactionDto(updated);
+    }
+
+    @Override
+    @Transactional
+    public void cancelPendingTransaction(Long transactionId) {
+        logger.info("Cancelling pending transaction {}", transactionId);
+        
+        // Find transaction
+        BlockchainTransaction transaction = blockchainTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Transaction with ID " + transactionId + " not found"));
+        
+        // Validate current status
+        if (transaction.getStatus() != TransactionStatus.PENDING) {
+            throw new IllegalStateException(
+                "Can only cancel transactions with PENDING status. Current status: " + 
+                transaction.getStatus());
+        }
+        
+        // Delete transaction
+        blockchainTransactionRepository.delete(transaction);
+        
+        logger.info("Transaction {} cancelled and removed", transactionId);
+    }
+
+    @Override
+    public BlockchainTransactionDto getTransactionByHash(String txHash) {
+        return blockchainTransactionRepository.findByTxHash(txHash)
+                .map(DtoMapper::toBlockchainTransactionDto)
+                .orElse(null);
+    }
 }
 
