@@ -28,7 +28,7 @@ public class NotesService {
     public Note updateNote(Long id, Note noteDetails) {
         validateNote(noteDetails);
         Note note = noteRepository.findById(id)
-                .orElseThrow(() -> new NoteNotFoundException(id));
+                .orElseThrow(() -> NoteNotFoundException.byId(id));
 
         note.setTitle(noteDetails.getTitle());
         note.setContent(noteDetails.getContent());
@@ -39,7 +39,7 @@ public class NotesService {
 
     public Note getNoteById(Long id) {
         return noteRepository.findById(id)
-                .orElseThrow(() -> new NoteNotFoundException(id));
+                .orElseThrow(() -> NoteNotFoundException.byId(id));
     }
 
     public List<Note> getAllNotes() {
@@ -48,13 +48,39 @@ public class NotesService {
 
     public void deleteNote(Long id) {
         if (!noteRepository.existsById(id)) {
-            throw new NoteNotFoundException(id);
+            throw NoteNotFoundException.byId(id);
         }
         noteRepository.deleteById(id);
     }
 
     public List<Note> searchNotes(String keyword) {
         return noteRepository.findByTitleOrContentContainingIgnoreCase(keyword);
+    }
+
+    /**
+     * Get all notes created by a specific wallet address
+     * 
+     * @param walletAddress Cardano wallet address
+     * @return List of notes created by this wallet
+     */
+    public List<Note> getNotesByWalletAddress(String walletAddress) {
+        if (walletAddress == null || walletAddress.isBlank()) {
+            throw new IllegalArgumentException("Wallet address cannot be empty");
+        }
+        return noteRepository.findByWalletAddress(walletAddress);
+    }
+
+    /**
+     * Get all on-chain notes created by a specific wallet address
+     * 
+     * @param walletAddress Cardano wallet address
+     * @return List of on-chain notes created by this wallet
+     */
+    public List<Note> getOnChainNotesByWalletAddress(String walletAddress) {
+        if (walletAddress == null || walletAddress.isBlank()) {
+            throw new IllegalArgumentException("Wallet address cannot be empty");
+        }
+        return noteRepository.findByWalletAddressAndOnChainStatus(walletAddress, true);
     }
 
     private void validateNote(Note note) {
@@ -72,7 +98,7 @@ public class NotesService {
     @Transactional
     public Note togglePinStatus(Long id) {
         Note note = noteRepository.findById(id)
-                .orElseThrow(() -> new NoteNotFoundException(id));
+                .orElseThrow(() -> NoteNotFoundException.byId(id));
         note.setPinned(!note.isPinned());
         return noteRepository.save(note);
     }
