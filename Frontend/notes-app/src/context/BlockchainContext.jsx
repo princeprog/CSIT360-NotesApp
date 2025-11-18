@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useWallet } from "./WalletContext";
-import { Blockfrost } from "@blaze-cardano/sdk";
 
 const BlockchainContext = createContext(null);
 
@@ -84,35 +83,44 @@ export const BlockchainProvider = ({ children }) => {
     });
   };
 
-  // Check transaction status on the blockchain
+  // Check transaction status on the blockchain via backend API
   const checkTransactionStatus = async (txHash) => {
     if (!txHash) return;
     
-    const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
-    if (!projectId) {
-      console.error("Blockfrost project ID not found");
-      return;
-    }
-    
     try {
       setIsLoading(true);
-      const provider = new Blockfrost({ 
-        network: 'cardano-preview', 
-        projectId 
-      });
       
-      const txInfo = await provider.fetchTransaction(txHash);
+      // Call backend API to get transaction status
+      const response = await fetch(
+        `http://localhost:8080/api/blockchain/transactions/${txHash}`
+      );
       
-      if (txInfo && txInfo.block) {
-        // Transaction is confirmed
-        updateTransactionStatus(txHash, "confirmed");
-      } else {
-        // Transaction is still pending
-        updateTransactionStatus(txHash, "pending");
+      if (!response.ok) {
+        // Transaction not found in backend yet (still pending)
+        console.log(`Transaction ${txHash} not yet indexed by backend`);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.result === 'SUCCESS' && data.data) {
+        const txData = data.data;
+        
+        // Map backend status to frontend status
+        let status = "pending";
+        if (txData.status === "CONFIRMED") {
+          status = "confirmed";
+        } else if (txData.status === "FAILED") {
+          status = "failed";
+        } else if (txData.status === "MEMPOOL") {
+          status = "pending"; // Still waiting for confirmation
+        }
+        
+        updateTransactionStatus(txHash, status);
       }
     } catch (err) {
       console.error("Error checking transaction status:", err);
-      updateTransactionStatus(txHash, "failed");
+      // Don't mark as failed on network errors - might just be backend not ready
     } finally {
       setIsLoading(false);
     }
