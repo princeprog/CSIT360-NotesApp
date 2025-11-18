@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../context/NotesContext';
 import { ArrowLeft } from 'lucide-react';
 
 function CreateNote() {
   const navigate = useNavigate();
-  const { createNote, loading, error } = useNotes();
+  const { createNote } = useNotes();
   
   const [formData, setFormData] = useState({
     title: '',
@@ -13,6 +13,18 @@ function CreateNote() {
     category: 'Personal'
   });
   const [categories] = useState(['Personal', 'Work', 'Study']);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Only use local submission state for form disabling
+  const loading = isSubmitting;
+
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (error && (formData.title || formData.content)) {
+      setError(null);
+    }
+  }, [formData.title, formData.content, error]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,12 +39,28 @@ function CreateNote() {
       return;
     }
     
-    const newNote = await createNote(formData);
-    if (newNote && newNote.id) {
-      navigate(`/notes/${newNote.id}`);
-    } else {
-      // If creation fails, stay on the create page
-      console.error("Failed to create note or get note ID");
+    // Store the current form data to prevent it from being lost
+    const currentFormData = { ...formData };
+    
+    try {
+      setError(null); // Clear any previous errors
+      setIsSubmitting(true); // Set local loading state
+      
+      const newNote = await createNote(currentFormData);
+      
+      if (newNote && newNote.id) {
+        // Only navigate on success
+        navigate(`/notes/${newNote.id}`);
+      } else {
+        // If no error was thrown but we didn't get a note back
+        setError("Failed to create note. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error creating note:", err);
+      setError(err.message || "Failed to create note. Please try again.");
+      // Form data is preserved because we're not navigating away
+    } finally {
+      setIsSubmitting(false); // Always reset submission state
     }
   };
 

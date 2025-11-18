@@ -1,14 +1,15 @@
 package com.notesapp.nabunturan.Service;
 
-import com.notesapp.nabunturan.Entity.Note;
-import com.notesapp.nabunturan.Exception.NoteNotFoundException;
-import com.notesapp.nabunturan.Repository.NoteRepository;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
+import com.notesapp.nabunturan.Entity.Note;
+import com.notesapp.nabunturan.Exception.NoteNotFoundException;
+import com.notesapp.nabunturan.Repository.NoteRepository;
 
 @Service
 public class NotesService {
@@ -90,8 +91,9 @@ public class NotesService {
         if (!StringUtils.hasText(note.getTitle())) {
             throw new IllegalArgumentException("Note title cannot be empty");
         }
-        if (!StringUtils.hasText(note.getContent())) {
-            throw new IllegalArgumentException("Note content cannot be empty");
+        // Content can be empty, so we don't validate it
+        if (note.getContent() == null) {
+            note.setContent(""); // Set empty string instead of null
         }
     }
 

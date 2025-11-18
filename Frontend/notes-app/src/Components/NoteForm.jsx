@@ -10,13 +10,18 @@ const NoteForm = ({
   isEditing = false 
 }) => {
   const [formData, setFormData] = useState(initialData);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Reset form data when initialData changes (i.e., when editing a different note)
+  // Only initialize form data when modal first opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !hasInitialized) {
       setFormData(initialData);
+      setHasInitialized(true);
     }
-  }, [initialData, isOpen]);
+    if (!isOpen) {
+      setHasInitialized(false);
+    }
+  }, [isOpen, initialData, hasInitialized]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
