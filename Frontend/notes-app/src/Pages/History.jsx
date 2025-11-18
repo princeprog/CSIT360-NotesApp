@@ -9,7 +9,7 @@ function History() {
       <h1 className="text-2xl font-bold mb-6">Activity History</h1>
 
       {history.length === 0 ? (
-        <p className="text-gray-500">No history yet.</p>
+        <p className="text-gray-500">No history.</p>
       ) : (
         <div className="space-y-4">
           {history.map((item) => (
