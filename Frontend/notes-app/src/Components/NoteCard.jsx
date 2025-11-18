@@ -22,12 +22,15 @@ const NoteCard = ({
         onClick={() => onOpen?.(note)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 hover:border-gray-300 cursor-pointer"
+        className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 hover:border-gray-300 cursor-pointer relative"
       >
-        <div className="flex justify-between items-start mb-3">
-          <h3 className="font-semibold text-gray-900 text-lg leading-tight line-clamp-2 pr-2">
-            {note.title}
-          </h3>
+        {/* Note ID Badge - Top Right Corner */}
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+          <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-xs font-bold border-2 border-blue-300 shadow-sm">
+            ID: {note.id}
+          </div>
+          
+          {/* Action Buttons Below ID */}
           <div className={`flex gap-1 ${hovered ? 'opacity-100' : 'opacity-60'} transition-opacity`} onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => onTogglePin(note.id)}
@@ -36,22 +39,31 @@ const NoteCard = ({
                   ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' 
                   : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50'
               }`}
+              title="Pin note"
             >
               <Star size={16} fill={note.pinned ? 'currentColor' : 'none'} />
             </button>
             <button
               onClick={() => onEdit(note)}
               className="p-2 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              title="Edit note"
             >
               <Edit3 size={16} />
             </button>
             <button
               onClick={() => onDelete(note.id)}
               className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Delete note"
             >
               <Trash2 size={16} />
             </button>
           </div>
+        </div>
+
+        <div className="flex justify-between items-start mb-3 pr-32">
+          <h3 className="font-semibold text-gray-900 text-lg leading-tight line-clamp-2">
+            {note.title}
+          </h3>
         </div>
         
         <p className="text-gray-600 text-sm line-clamp-3 mb-4 leading-relaxed">

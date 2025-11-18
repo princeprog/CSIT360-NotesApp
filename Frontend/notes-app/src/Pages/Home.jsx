@@ -161,16 +161,17 @@ function Home() {
       <div
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } transform transition-transform duration-300 ease-in-out fixed md:relative bg-white h-full shadow-xl z-50 w-80 md:w-72 md:translate-x-0 border-r border-gray-200`}
+        } transform transition-transform duration-300 ease-in-out fixed md:relative bg-white h-full shadow-xl z-50 w-[36rem] md:w-[30rem] md:translate-x-0 border-r-2 border-gray-300 overflow-y-auto`}
       >
-        <div className="p-6 h-full flex flex-col">
+        {/* Header Section */}
+        <div className="sticky top-0 z-10 p-6 border-b-2 border-gray-300 bg-white shadow-sm">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                 <Edit3 size={20} className="text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-lg font-bold text-gray-900">
                 Saint Nabunturan Notes
               </h1>
             </div>
@@ -187,15 +188,18 @@ function Home() {
           {/* New Note Button */}
           <button
             onClick={openCreateModal}
-            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl py-4 mb-8 flex items-center justify-center gap-2 hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl py-4 flex items-center justify-center gap-2 hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl font-semibold"
           >
             <Plus size={20} />
             New Note
           </button>
+        </div>
 
+        {/* Categories Section */}
+        <div className="p-6 bg-white">
           {/* Categories */}
           <div className="mb-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 px-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-4 px-2 border-b-2 border-gray-200 pb-2">
               Categories
             </h3>
             <div className="space-y-1">
@@ -220,10 +224,10 @@ function Home() {
                           : "hover:bg-gray-50 text-gray-600"
                       }`}
                     >
-                      <span>{category}</span>
+                      <span className="text-sm">{category}</span>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-xs px-2 py-1 rounded-full ${
+                          className={`text-xs px-2 py-1 rounded-full font-medium ${
                             activeCategory === category
                               ? "bg-blue-100 text-blue-600"
                               : "bg-gray-100 text-gray-500"
@@ -239,8 +243,11 @@ function Home() {
               )}
             </div>
           </div>
+        </div>
 
-          <div className="mt-auto pt-6 border-t border-gray-200">
+        {/* Wallet Section */}
+        <div className="border-t-4 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+          <div className="p-6">
             <WalletConnect />
           </div>
         </div>

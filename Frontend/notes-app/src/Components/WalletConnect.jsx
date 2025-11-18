@@ -14,11 +14,11 @@ export default function WalletConnect() {
     disconnectWallet,
     isConnected,
     walletAddress,
+    walletApi, // <-- USE FROM CONTEXT
     readUtxos, // <-- new
   } = useWallet();
   const { getNoteById } = useNotes(); // used to fetch note metadata from localhost backend
 
-  const [walletApi, setWalletApi] = useState(null);
   const [localWalletAddress, setLocalWalletAddress] = useState(null);
 
   const [localSelectedWallet, setLocalSelectedWallet] = useState("");
@@ -268,8 +268,6 @@ export default function WalletConnect() {
       if (provider && typeof provider.enable === "function") {
         try {
           const api = await provider.enable();
-          // store the enabled CIP-30 API so handleSubmitTransaction can use it
-          setWalletApi(api);
           // getChangeAddress typically returns a hex/address string depending on wallet impl
           const address = await api.getChangeAddress();
           setLocalWalletAddress(address);
@@ -403,114 +401,168 @@ export default function WalletConnect() {
 
   if (isConnected) {
     return (
-      <div className="space-y-3">
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-green-700 mb-2">
-            <Check size={18} />
-            <span className="font-semibold">Connected to {selectedWallet}</span>
+      <div className="space-y-4 pb-2">
+        {/* Wallet Status Section */}
+        <div className="bg-gradient-to-br from-green-100 to-emerald-100 border-2 border-green-400 rounded-2xl p-5 shadow-md">
+          <div className="flex items-center gap-3 text-green-800 mb-3">
+            <Check size={24} className="flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-lg text-green-900">Connected to {selectedWallet}</p>
+              {walletAddress && (
+                <p className="text-sm text-green-700 font-mono mt-1 break-all">
+                  {formatAddress(walletAddress)}
+                </p>
+              )}
+            </div>
           </div>
-          {walletAddress && (
-            <p className="text-xs text-green-600 font-mono">
-              {formatAddress(walletAddress)}
-            </p>
-          )}
+          <button
+            onClick={disconnectWallet}
+            className="w-full py-3 rounded-xl bg-white hover:bg-gray-50 text-gray-800 font-semibold transition-colors shadow-sm border border-gray-300"
+          >
+            Disconnect Wallet
+          </button>
         </div>
-        <button
-          onClick={disconnectWallet}
-          className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-colors"
-        >
-          Disconnect Wallet
-        </button>
 
-        {/* Send inputs */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
-          <input
-            type="text"
-            placeholder="Recipient address"
-            value={recipient}
-            onChange={handleRecipientChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-          />
-          <input
-            type="number"
-            placeholder="Amount (lovelaces)"
-            value={amount}
-            onChange={handleAmountChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
-            min="0"
-            step="1"
-          />
-
-          {/* Include note metadata controls */}
-          <div className="flex items-center gap-3 mt-1">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={includeNote}
-                onChange={handleIncludeNoteToggle}
-                className="w-4 h-4"
-              />
-              Include a note from backend as on-chain metadata
-            </label>
-            {includeNote && (
+        {/* Transaction Builder Section */}
+        <div className="bg-white border-2 border-gray-300 rounded-2xl p-5 shadow-md space-y-4">
+          <h3 className="font-bold text-lg text-gray-900 mb-3 border-b-2 border-gray-200 pb-2">Build Transaction</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-base font-semibold text-gray-800 mb-2">
+                Recipient Address
+              </label>
               <input
                 type="text"
-                placeholder="Note ID"
-                value={noteIdInput}
-                onChange={handleNoteIdChange}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none"
+                placeholder="addr_test1..."
+                value={recipient}
+                onChange={handleRecipientChange}
+                className="w-full px-4 py-3 border-2 border-gray-400 rounded-xl text-base text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
               />
-            )}
+            </div>
+
+            <div>
+              <label className="block text-base font-semibold text-gray-800 mb-2">
+                Amount (lovelaces)
+              </label>
+              <input
+                type="number"
+                placeholder="1000000"
+                value={amount}
+                onChange={handleAmountChange}
+                className="w-full px-4 py-3 border-2 border-gray-400 rounded-xl text-base text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                min="0"
+                step="1"
+              />
+            </div>
+
+            {/* Include note metadata controls */}
+            <div className="space-y-3 pt-2 border-t border-gray-200">
+              <label className="flex items-start gap-3 text-base text-gray-800 cursor-pointer pt-2">
+                <input
+                  type="checkbox"
+                  checked={includeNote}
+                  onChange={handleIncludeNoteToggle}
+                  className="w-5 h-5 mt-1 rounded cursor-pointer accent-blue-600"
+                />
+                <span className="leading-relaxed font-medium">
+                  Include note as on-chain metadata
+                </span>
+              </label>
+              
+              {includeNote && (
+                <div className="pl-8 bg-blue-50 p-4 rounded-xl border border-blue-200">
+                  <label className="block text-base font-semibold text-gray-800 mb-2">
+                    Note ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter note ID"
+                    value={noteIdInput}
+                    onChange={handleNoteIdChange}
+                    className="w-full px-4 py-3 border-2 border-gray-400 rounded-xl text-base text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all bg-white"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
-          {sendError && <p className="text-xs text-red-600">{sendError}</p>}
-          {sendSuccess && <p className="text-xs text-green-600">{sendSuccess}</p>}
+          {/* Error Message */}
+          {sendError && (
+            <div className="bg-red-100 border-2 border-red-400 rounded-xl p-4 mt-4">
+              <p className="text-base text-red-800 font-semibold leading-relaxed">{sendError}</p>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {sendSuccess && (
+            <div className="bg-green-100 border-2 border-green-400 rounded-xl p-4 mt-4">
+              <p className="text-base text-green-900 font-bold mb-3">✅ Transaction Submitted!</p>
+              <div className="bg-white rounded-lg p-4 mt-2 border border-gray-300">
+                <p className="text-sm text-gray-700 mb-2 font-semibold">Transaction Hash:</p>
+                <p className="text-sm text-gray-900 font-mono break-all leading-relaxed bg-gray-50 p-3 rounded border border-gray-200">
+                  {sendSuccess.split('TxHash: ')[1]}
+                </p>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handleSubmitTransaction}
             disabled={isSending}
-            className="w-full mt-1 py-2 rounded-lg bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full mt-4 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all"
           >
             {isSending ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={22} className="animate-spin" />
                 Processing...
               </>
             ) : (
-              "Build, Sign & Submit Transaction"
+              "Build, Sign & Submit"
             )}
           </button>
         </div>
 
-        {/* New: Read UTXOs button */}
-        <button
-          onClick={handleReadUtxos}
-          disabled={isReading}
-          className="w-full py-3 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-        >
-          {isReading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Reading UTXOs...
-            </>
-          ) : (
-            "Read UTXOs"
+        {/* UTXOs Section */}
+        <div className="bg-white border-2 border-gray-300 rounded-2xl p-5 shadow-md">
+          <h3 className="font-bold text-lg text-gray-900 mb-3 border-b-2 border-gray-200 pb-2">Wallet UTXOs</h3>
+          
+          <button
+            onClick={handleReadUtxos}
+            disabled={isReading}
+            className="w-full py-3.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-60 border border-gray-400"
+          >
+            {isReading ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Reading UTXOs...
+              </>
+            ) : (
+              "Read UTXOs"
+            )}
+          </button>
+
+          {/* Show utxo error */}
+          {utxoError && (
+            <div className="bg-red-100 border-2 border-red-400 rounded-xl p-4 mt-4">
+              <p className="text-base text-red-800 font-semibold">{utxoError}</p>
+            </div>
           )}
-        </button>
 
-        {/* Show utxo results or error */}
-        {utxoError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-2">
-            <p className="text-xs text-red-600">{utxoError}</p>
-          </div>
-        )}
-
-        {utxos && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-2">
-            <p className="text-xs text-gray-600 mb-2 font-medium">UTXOs ({utxos.length})</p>
-            <pre className="text-xs text-gray-700 overflow-x-auto max-h-40">{JSON.stringify(utxos, null, 2)}</pre>
-          </div>
-        )}
+          {/* Show utxos */}
+          {utxos && (
+            <div className="bg-gray-100 border-2 border-gray-300 rounded-xl p-4 mt-4">
+              <p className="text-base text-gray-900 mb-3 font-bold">
+                UTXOs Found: {utxos.length}
+              </p>
+              <div className="bg-white rounded-lg p-4 max-h-[32rem] overflow-y-auto border border-gray-300">
+                <pre className="text-sm text-gray-900 font-mono whitespace-pre-wrap break-all leading-relaxed">
+                  {JSON.stringify(utxos, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
