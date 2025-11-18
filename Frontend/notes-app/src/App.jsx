@@ -24,6 +24,7 @@ function App() {
             <Route path="/create" element={<CreateNote />} />
             <Route path="/edit/:id" element={<EditNote />} />
             <Route path="*" element={<Navigate to="/notes" replace />} />
+            <Route path="/history" element={<History />} />
           </Routes>
         </Router>
       </NotesProvider>

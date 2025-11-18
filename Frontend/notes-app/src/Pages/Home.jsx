@@ -24,7 +24,9 @@ function Home() {
     deleteNote,
     togglePin,
     searchNotes,
+    history,
   } = useNotes();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All Notes");
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,49 +40,40 @@ function Home() {
   const [wallets, setWallets] = useState([]);
   const [selectedWallet, setSelectedWallet] = useState("");
   const [walletApi, setWalletApi] = useState(null);
-  const [walletAddress, setWalletAddress] = useState(null);
 
   const handleSelectWallet = (e) => {
     setSelectedWallet(e.target.value);
     console.log("Selected wallet:", e.target.value);
-  }   
+  };
 
-  const handleConnectWallet = async() => {
-    console.log("Connecting to wallet:", window.cardano[selectedWallet]);
-    if(window.cardano && selectedWallet) {
+  const handleConnectWallet = async () => {
+    if (window.cardano && selectedWallet) {
       try {
         const api = await window.cardano[selectedWallet].enable();
         setWalletApi(api);
-        console.log("Connected to Wallet API:", api);
         const addresses = await api.getUsedAddresses();
         console.log("Wallet Addresses:", addresses);
       } catch (error) {
         console.error("Error connecting to wallet:", error);
       }
     }
-  }
+  };
 
-  // Handle responsive sidebar
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (mobile) setSidebarOpen(false);
-      else setSidebarOpen(true);
+      setSidebarOpen(!mobile);
     };
-
     window.addEventListener("resize", handleResize);
     handleResize();
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
-    if (window.cardano) {
-      setWallets(Object.keys(window.cardano));
-    }
+    if (window.cardano) setWallets(Object.keys(window.cardano));
   }, []);
 
-  // Extract unique categories from notes
   useEffect(() => {
     if (notes && notes.length > 0) {
       const uniqueCategories = [...new Set(notes.map((note) => note.category))];
@@ -88,19 +81,12 @@ function Home() {
     }
   }, [notes]);
 
-  // Handle search
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (searchTerm) {
-        searchNotes(searchTerm).then((results) => {
-          setSearchResults(results);
-        });
-      } else {
-        setSearchResults(null);
-      }
+    const delay = setTimeout(() => {
+      if (searchTerm) searchNotes(searchTerm).then((res) => setSearchResults(res));
+      else setSearchResults(null);
     }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
+    return () => clearTimeout(delay);
   }, [searchTerm, searchNotes]);
 
   const filteredNotes =
@@ -115,8 +101,8 @@ function Home() {
   const pinnedNotes = filteredNotes.filter((note) => note.pinned);
   const unpinnedNotes = filteredNotes.filter((note) => !note.pinned);
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString("en-US", {
+  const formatDate = (date) =>
+    new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year:
@@ -124,32 +110,23 @@ function Home() {
           ? "numeric"
           : undefined,
     });
-  };
 
   const openCreateModal = () => {
     setEditingNote(null);
     setIsModalOpen(true);
   };
-
   const openEditModal = (note) => {
     setEditingNote(note);
     setIsModalOpen(true);
   };
-
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingNote(null);
   };
-
   const handleSubmit = async (noteData) => {
-    if (noteData.title.trim() === "") return;
-
-    if (editingNote) {
-      await updateNote(editingNote.id, noteData);
-    } else {
-      await createNote(noteData);
-    }
-
+    if (!noteData.title.trim()) return;
+    if (editingNote) await updateNote(editingNote.id, noteData);
+    else await createNote(noteData);
     closeModal();
   };
 
@@ -160,34 +137,27 @@ function Home() {
       setDeleteModalOpen(true);
     }
   };
-
   const handleDeleteNote = async () => {
     if (noteToDelete) {
       await deleteNote(noteToDelete.id);
       closeDeleteModal();
     }
   };
-
   const closeDeleteModal = () => {
     setDeleteModalOpen(false);
     setNoteToDelete(null);
   };
-
-  const handleTogglePin = async (id) => {
-    await togglePin(id);
-  };
+  const handleTogglePin = async (id) => await togglePin(id);
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Mobile Overlay */}
+      {/* Sidebar */}
       {isMobile && sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-
-      {/* Sidebar */}
       <div
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -229,47 +199,47 @@ function Home() {
               Categories
             </h3>
             <div className="space-y-1">
-              {categories.map((category) => {
-                const count =
-                  category === "All Notes"
-                    ? notes.length
-                    : notes.filter((note) => note.category === category).length;
-
-                return (
-                  <button
-                    key={category}
-                    onClick={() => {
-                      setActiveCategory(category);
-                      if (isMobile) setSidebarOpen(false);
-                    }}
-                    className={`w-full text-left py-3 px-4 rounded-xl flex items-center justify-between transition-all ${
-                      activeCategory === category
-                        ? "bg-blue-50 text-blue-700 font-semibold shadow-sm"
-                        : "hover:bg-gray-50 text-gray-600"
-                    }`}
-                  >
-                    <span>{category}</span>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          activeCategory === category
-                            ? "bg-blue-100 text-blue-600"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                      {activeCategory === category && (
-                        <ChevronRight size={16} />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+              {["All Notes", "History", ...categories.filter(c => c !== "All Notes")].map(
+                (category) => {
+                  const count =
+                    category === "All Notes"
+                      ? notes.length
+                      : category === "History"
+                      ? history.length
+                      : notes.filter((note) => note.category === category).length;
+                  return (
+                    <button
+                      key={category}
+                      onClick={() => {
+                        setActiveCategory(category);
+                        if (isMobile) setSidebarOpen(false);
+                      }}
+                      className={`w-full text-left py-3 px-4 rounded-xl flex items-center justify-between transition-all ${
+                        activeCategory === category
+                          ? "bg-blue-50 text-blue-700 font-semibold shadow-sm"
+                          : "hover:bg-gray-50 text-gray-600"
+                      }`}
+                    >
+                      <span>{category}</span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            activeCategory === category
+                              ? "bg-blue-100 text-blue-600"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                        {activeCategory === category && <ChevronRight size={16} />}
+                      </div>
+                    </button>
+                  );
+                }
+              )}
             </div>
           </div>
 
-          {/* Wallet Connect Section */}
           <div className="mt-auto pt-6 border-t border-gray-200">
             <WalletConnect />
           </div>
@@ -288,7 +258,6 @@ function Home() {
               >
                 <Menu size={24} />
               </button>
-
               <div className="relative">
                 <Search
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -303,11 +272,9 @@ function Home() {
                 />
               </div>
             </div>
-
             <div className="flex items-center gap-3">
               <div className="text-sm text-gray-600 hidden sm:block">
-                {filteredNotes.length}{" "}
-                {filteredNotes.length === 1 ? "note" : "notes"}
+                {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
               </div>
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white font-semibold text-sm">
                 UN
@@ -318,91 +285,118 @@ function Home() {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
-          ) : error ? (
-            <div className="flex items-center justify-center h-full text-red-500">
-              {error}
-            </div>
-          ) : filteredNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-                <Edit3 size={32} className="text-gray-400" />
-              </div>
-              <h3 className="text-2xl font-semibold text-gray-700 mb-3">
-                {searchTerm ? "No notes found" : "Start writing"}
-              </h3>
-              <p className="text-gray-500 mb-8 leading-relaxed">
-                {searchTerm
-                  ? "Try adjusting your search terms to find what you're looking for."
-                  : "Capture your thoughts, ideas, and reminders in one place. Create your first note to get started."}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={openCreateModal}
-                  className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors flex items-center gap-2 font-semibold"
-                >
-                  <Plus size={20} />
-                  Create your first note
-                </button>
+          {/* History Section */}
+          {activeCategory === "History" && (
+            <div className="mb-6 max-w-6xl mx-auto">
+              <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
+                Recent Activity
+              </h2>
+              {history.length === 0 ? (
+                <p className="text-gray-500">No history yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {history.slice(0, 10).map((entry, index) => (
+                    <div
+                      key={index}
+                      className="px-4 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 flex justify-between"
+                    >
+                      <div>
+                        <span className="font-semibold">{entry.action}</span> "{entry.noteTitle}"
+                      </div>
+                      <div className="text-gray-400">
+                        {new Date(entry.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          ) : (
-            <div className="max-w-6xl mx-auto">
-              {/* Pinned Notes */}
-              {pinnedNotes.length > 0 && (
-                <div className="mb-8">
-                  <h2 className="text-sm font-semibold text-gray-500 mb-4 flex items-center gap-2 uppercase tracking-wider">
-                    <Star
-                      className="text-amber-500"
-                      size={16}
-                      fill="currentColor"
-                    />
-                    Pinned Notes
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pinnedNotes.map((note) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
-                        onTogglePin={handleTogglePin}
-                        onEdit={openEditModal}
-                        onDelete={confirmDelete}
-                        formatDate={formatDate}
-                      />
-                    ))}
+          )}
+
+          {/* Notes Section */}
+          {activeCategory !== "History" && (
+            <>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+              ) : error ? (
+                <div className="flex items-center justify-center h-full text-red-500">
+                  {error}
+                </div>
+              ) : filteredNotes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
+                  <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                    <Edit3 size={32} className="text-gray-400" />
+                  </div>
+                  <h3 className="text-2xl font-semibold text-gray-700 mb-3">
+                    {searchTerm ? "No notes found" : "Start writing"}
+                  </h3>
+                  <p className="text-gray-500 mb-8 leading-relaxed">
+                    {searchTerm
+                      ? "Try adjusting your search terms to find what you're looking for."
+                      : "Capture your thoughts, ideas, and reminders in one place. Create your first note to get started."}
+                  </p>
+                  {!searchTerm && (
+                    <button
+                      onClick={openCreateModal}
+                      className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors flex items-center gap-2 font-semibold"
+                    >
+                      <Plus size={20} />
+                      Create your first note
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="max-w-6xl mx-auto">
+                  {pinnedNotes.length > 0 && (
+                    <div className="mb-8">
+                      <h2 className="text-sm font-semibold text-gray-500 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Star className="text-amber-500" size={16} fill="currentColor" />
+                        Pinned Notes
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {pinnedNotes.map((note) => (
+                          <NoteCard
+                            key={note.id}
+                            note={note}
+                            onTogglePin={handleTogglePin}
+                            onEdit={openEditModal}
+                            onDelete={confirmDelete}
+                            formatDate={formatDate}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
+                      {activeCategory === "All Notes" ? "All Notes" : activeCategory}
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {unpinnedNotes.map((note) => (
+                        <NoteCard
+                          key={note.id}
+                          note={note}
+                          onTogglePin={handleTogglePin}
+                          onEdit={openEditModal}
+                          onDelete={confirmDelete}
+                          formatDate={formatDate}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* All Notes */}
-              <div>
-                <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
-                  {activeCategory === "All Notes"
-                    ? "All Notes"
-                    : activeCategory}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {unpinnedNotes.map((note) => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      onTogglePin={handleTogglePin}
-                      onEdit={openEditModal}
-                      onDelete={confirmDelete}
-                      formatDate={formatDate}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* Note Form Modal */}
       <NoteForm
         isOpen={isModalOpen}
         onClose={closeModal}
@@ -418,7 +412,6 @@ function Home() {
         isEditing={!!editingNote}
       />
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={deleteModalOpen}
         onClose={closeDeleteModal}
