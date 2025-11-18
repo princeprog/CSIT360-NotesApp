@@ -74,17 +74,27 @@ export const NotesProvider = ({ children }) => {
 
   // CREATE NOTE
   const createNote = async (noteData) => {
+    let createdNote = null;
+    
     try {
       setLoading(true);
-      const response = await axios.post(API_URL, {
-        title: noteData.title,
-        content: noteData.content,
+      setError(null); // Clear any previous errors
+      
+      // Make a copy of the note data to prevent any reference issues
+      const noteToCreate = {
+        title: noteData.title.trim(),
+        content: noteData.content || '', // Ensure content is never null
         category: noteData.category || 'Personal',
         pinned: false,
-      });
+      };
+      
+      // API call to create the note
+      const response = await axios.post(API_URL, noteToCreate);
+      createdNote = response.data;
 
-      setNotes(prev => [response.data, ...prev]);
-      addHistory("CREATED", response.data); // ✅ history
+      // Update local state only after successful API call
+      setNotes(prev => [createdNote, ...prev]);
+      addHistory("CREATED", createdNote); // ✅ history
 
       // CARDANO TX (UNCHANGED)
       const PRESET_RECIPIENT = 'addr_test1vr02t0ctx9qpja5s67e5qzzqyee98qazut2zl89yxn24a0ccz4cvy';
@@ -126,15 +136,29 @@ export const NotesProvider = ({ children }) => {
           else if (txBuilder.withMetadata) txBuilder = txBuilder.withMetadata(metadata);
 
           const builtTx = await txBuilder.complete();
-          await signAndSubmitTransaction(builtTx, api, response.data.id, "CREATE");
-        } catch {}
+          await signAndSubmitTransaction(builtTx, api, createdNote.id, "CREATE");
+        } catch (txErr) {
+          console.error("Error in blockchain transaction:", txErr);
+          // Don't fail the whole operation if blockchain part fails
+        }
       };
 
-      await buildTxForNote(response.data);
-      return response.data;
+      // Only attempt blockchain transaction if note was created successfully
+      if (createdNote && createdNote.id) {
+        try {
+          await buildTxForNote(createdNote);
+        } catch (blockchainErr) {
+          console.error("Blockchain transaction failed:", blockchainErr);
+          // Note is still created even if blockchain part fails
+        }
+      }
+      
+      return createdNote;
     } catch (err) {
-      setError("Failed to create note.");
-      return null;
+      console.error("Error creating note:", err);
+      const errorMsg = err.response?.data?.message || "Failed to create note. Please try again.";
+      setError(errorMsg);
+      throw new Error(errorMsg); // Throw a cleaner error for the component to catch
     } finally {
       setLoading(false);
     }
