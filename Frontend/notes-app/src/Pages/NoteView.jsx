@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNotes } from '../context/NotesContext';
-import { ArrowLeft, Edit, Trash2, Star, Calendar } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Star, Calendar, Clock, CheckCircle, AlertCircle, History } from 'lucide-react';
+import TransactionHistoryModal from '../Components/TransactionHistoryModal';
 import DeleteConfirmationModal from '../Components/DeleteConfirmationModal';
 
 function NoteView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getNoteById, deleteNote, togglePin, loading, error } = useNotes();
+  const { getNoteById, deleteNote, togglePin, loading, error, getNoteBlockchainStatus } = useNotes();
   const [note, setNote] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loadingNote, setLoadingNote] = useState(true);
   const [loadingError, setLoadingError] = useState(null);
+  const [showTransactionHistory, setShowTransactionHistory] = useState(false);
+  const [blockchainStatus, setBlockchainStatus] = useState("none");
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -29,6 +32,9 @@ function NoteView() {
       
       if (fetchedNote) {
         setNote(fetchedNote);
+        // Get blockchain status
+        const status = await getNoteBlockchainStatus(fetchedNote.id);
+        setBlockchainStatus(status);
       } else {
         setLoadingError("Could not find the requested note");
       }
@@ -144,9 +150,43 @@ function NoteView() {
           </div>
           
           <div className="mb-4">
-            <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium mb-4">
-              {note.category}
-            </span>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                {note.category}
+              </span>
+              
+              {/* Blockchain Status Badge */}
+              {blockchainStatus !== "none" && (
+                <div className="flex items-center gap-2">
+                  {blockchainStatus === "pending" && (
+                    <span className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
+                      <Clock size={14} className="animate-pulse" />
+                      Pending on Blockchain
+                    </span>
+                  )}
+                  {blockchainStatus === "confirmed" && (
+                    <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                      <CheckCircle size={14} />
+                      Confirmed on Blockchain
+                    </span>
+                  )}
+                  {blockchainStatus === "failed" && (
+                    <span className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
+                      <AlertCircle size={14} />
+                      Failed on Blockchain
+                    </span>
+                  )}
+                  
+                  <button 
+                    onClick={() => setShowTransactionHistory(true)}
+                    className="flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    <History size={14} />
+                    View Transactions
+                  </button>
+                </div>
+              )}
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-4">{note.title}</h1>
             
             <div className="flex items-center text-gray-500 text-sm mb-6">
@@ -168,6 +208,12 @@ function NoteView() {
         onClose={() => setIsDeleting(false)}
         onConfirm={handleDelete}
         noteTitle={note.title}
+      />
+      
+      {/* Transaction History Modal */}
+      <TransactionHistoryModal
+        isOpen={showTransactionHistory}
+        onClose={() => setShowTransactionHistory(false)}
       />
     </div>
   );

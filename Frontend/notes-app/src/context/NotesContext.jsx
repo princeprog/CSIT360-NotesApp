@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Blockfrost, WebWallet, Blaze, Core } from "@blaze-cardano/sdk";
+import { useBlockchain } from './BlockchainContext';
 
 const API_URL = 'http://localhost:8080/api/notes';
 const NotesContext = createContext(null);
@@ -10,6 +11,7 @@ export const NotesProvider = ({ children }) => {
   const [history, setHistory] = useState([]); // ✅ NEW
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { trackTransaction, getNoteBlockchainStatus } = useBlockchain();
 
   // ✅ Add History Entry
   const addHistory = (action, note) => {
@@ -25,7 +27,7 @@ export const NotesProvider = ({ children }) => {
   };
 
   // Helper function to sign + submit
-  const signAndSubmitTransaction = async (builtTx, walletApi) => {
+  const signAndSubmitTransaction = async (builtTx, walletApi, noteId, action) => {
     if (!builtTx || !walletApi) {
       throw new Error("Built transaction and wallet API are required");
     }
@@ -40,6 +42,12 @@ export const NotesProvider = ({ children }) => {
 
       const signedTxCbor = signedTx.toCbor();
       const txHash = await walletApi.submitTx(signedTxCbor);
+      
+      // Track the transaction in blockchain context
+      if (noteId) {
+        trackTransaction(txHash, noteId, action);
+      }
+      
       return { success: true, txHash };
     } catch (err) {
       console.error("Error signing/submitting transaction:", err);
@@ -118,7 +126,7 @@ export const NotesProvider = ({ children }) => {
           else if (txBuilder.withMetadata) txBuilder = txBuilder.withMetadata(metadata);
 
           const builtTx = await txBuilder.complete();
-          await signAndSubmitTransaction(builtTx, api);
+          await signAndSubmitTransaction(builtTx, api, response.data.id, "CREATE");
         } catch {}
       };
 
@@ -237,7 +245,8 @@ export const NotesProvider = ({ children }) => {
     togglePin,
     getNoteById,
     searchNotes,
-  }), [notes, history, loading, error]);
+    getNoteBlockchainStatus, // Expose blockchain status function
+  }), [notes, history, loading, error, getNoteBlockchainStatus]);
 
   return (
     <NotesContext.Provider value={value}>
