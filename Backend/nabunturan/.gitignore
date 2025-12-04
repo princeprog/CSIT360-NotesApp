@@ -63,6 +63,11 @@ ehthumbs_vista.db
 src/main/resources/application-*.properties
 !src/main/resources/application.properties
 
+### Environment Variables ###
+.env
+.env.local
+.env.*.local
+
 ### Logs ###
 logs/
 *.log

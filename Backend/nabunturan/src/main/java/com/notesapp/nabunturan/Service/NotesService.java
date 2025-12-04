@@ -2,13 +2,11 @@ package com.notesapp.nabunturan.Service;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.notesapp.nabunturan.Entity.Note;
-import com.notesapp.nabunturan.Exception.NoteNotFoundException;
 import com.notesapp.nabunturan.Repository.NoteRepository;
 
 @Service
@@ -16,7 +14,6 @@ public class NotesService {
 
     private final NoteRepository noteRepository;
 
-    @Autowired
     public NotesService(NoteRepository noteRepository) {
         this.noteRepository = noteRepository;
     }
@@ -29,7 +26,7 @@ public class NotesService {
     public Note updateNote(Long id, Note noteDetails) {
         validateNote(noteDetails);
         Note note = noteRepository.findById(id)
-                .orElseThrow(() -> NoteNotFoundException.byId(id));
+                .orElseThrow(() -> new IllegalArgumentException("Id not found"));
 
         note.setTitle(noteDetails.getTitle());
         note.setContent(noteDetails.getContent());
@@ -40,7 +37,7 @@ public class NotesService {
 
     public Note getNoteById(Long id) {
         return noteRepository.findById(id)
-                .orElseThrow(() -> NoteNotFoundException.byId(id));
+                .orElseThrow(() -> new IllegalArgumentException("Note not found with id: " + id));
     }
 
     public List<Note> getAllNotes() {
@@ -49,7 +46,7 @@ public class NotesService {
 
     public void deleteNote(Long id) {
         if (!noteRepository.existsById(id)) {
-            throw NoteNotFoundException.byId(id);
+            throw new IllegalArgumentException("Note not found with id: " + id);
         }
         noteRepository.deleteById(id);
     }
@@ -58,32 +55,7 @@ public class NotesService {
         return noteRepository.findByTitleOrContentContainingIgnoreCase(keyword);
     }
 
-    /**
-     * Get all notes created by a specific wallet address
-     * 
-     * @param walletAddress Cardano wallet address
-     * @return List of notes created by this wallet
-     */
-    public List<Note> getNotesByWalletAddress(String walletAddress) {
-        if (walletAddress == null || walletAddress.isBlank()) {
-            throw new IllegalArgumentException("Wallet address cannot be empty");
-        }
-        return noteRepository.findByWalletAddress(walletAddress);
-    }
-
-    /**
-     * Get all on-chain notes created by a specific wallet address
-     * 
-     * @param walletAddress Cardano wallet address
-     * @return List of on-chain notes created by this wallet
-     */
-    public List<Note> getOnChainNotesByWalletAddress(String walletAddress) {
-        if (walletAddress == null || walletAddress.isBlank()) {
-            throw new IllegalArgumentException("Wallet address cannot be empty");
-        }
-        return noteRepository.findByWalletAddressAndOnChainStatus(walletAddress, true);
-    }
-
+    
     private void validateNote(Note note) {
         if (note == null) {
             throw new IllegalArgumentException("Note cannot be null");
@@ -100,7 +72,7 @@ public class NotesService {
     @Transactional
     public Note togglePinStatus(Long id) {
         Note note = noteRepository.findById(id)
-                .orElseThrow(() -> NoteNotFoundException.byId(id));
+                .orElseThrow(() -> new IllegalArgumentException("Note not found with id: " + id));
         note.setPinned(!note.isPinned());
         return noteRepository.save(note);
     }

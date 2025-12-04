@@ -7,18 +7,25 @@ import java.util.List;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "notes")
+@Table(name = "notes", indexes = {
+    @Index(name = "idx_notes_status", columnList = "status"),
+    @Index(name = "idx_notes_tx_hash", columnList = "tx_hash"),
+    @Index(name = "idx_notes_wallet_address", columnList = "wallet_address"),
+    @Index(name = "idx_notes_created_at", columnList = "created_at")
+})
 public class Note {
 
     @Id
@@ -54,8 +61,21 @@ public class Note {
     @Column(name = "latest_tx_hash", length = 64)
     private String latestTxHash;
 
-    @OneToMany(mappedBy = "note", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<BlockchainTransaction> blockchainTransactions = new ArrayList<>();
+    @Column(length = 50)
+    private String status;
+
+    @Column(name = "tx_hash", length = 64)
+    private String txHash;
+
+    @Column(name = "wallet_address", length = 150)
+    private String walletAddress;
+
+    @Column(name = "last_updated_tx_hash", length = 64)
+    private String lastUpdatedTxHash;
+
+    @OneToMany(mappedBy = "note", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Transaction> transactions = new ArrayList<>();
 
     public Note() {}
 
@@ -146,23 +166,54 @@ public class Note {
         this.latestTxHash = latestTxHash;
     }
 
-    public List<BlockchainTransaction> getBlockchainTransactions() {
-        return blockchainTransactions;
+    public String getStatus() {
+        return status;
     }
 
-    public void setBlockchainTransactions(List<BlockchainTransaction> blockchainTransactions) {
-        this.blockchainTransactions = blockchainTransactions;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    // Helper method to add a blockchain transaction
-    public void addBlockchainTransaction(BlockchainTransaction transaction) {
-        blockchainTransactions.add(transaction);
+    public String getTxHash() {
+        return txHash;
+    }
+
+    public void setTxHash(String txHash) {
+        this.txHash = txHash;
+    }
+
+    public String getWalletAddress() {
+        return walletAddress;
+    }
+
+    public void setWalletAddress(String walletAddress) {
+        this.walletAddress = walletAddress;
+    }
+
+    public String getLastUpdatedTxHash() {
+        return lastUpdatedTxHash;
+    }
+
+    public void setLastUpdatedTxHash(String lastUpdatedTxHash) {
+        this.lastUpdatedTxHash = lastUpdatedTxHash;
+    }
+
+    public List<Transaction> getTransactions() {
+        return transactions;
+    }
+
+    public void setTransactions(List<Transaction> transactions) {
+        this.transactions = transactions;
+    }
+
+    // Helper methods for managing bidirectional relationship
+    public void addTransaction(Transaction transaction) {
+        transactions.add(transaction);
         transaction.setNote(this);
     }
 
-    // Helper method to remove a blockchain transaction
-    public void removeBlockchainTransaction(BlockchainTransaction transaction) {
-        blockchainTransactions.remove(transaction);
+    public void removeTransaction(Transaction transaction) {
+        transactions.remove(transaction);
         transaction.setNote(null);
     }
 
@@ -176,6 +227,10 @@ public class Note {
                 ", onChain=" + onChain +
                 ", createdByWallet='" + createdByWallet + '\'' +
                 ", latestTxHash='" + latestTxHash + '\'' +
+                ", status='" + status + '\'' +
+                ", txHash='" + txHash + '\'' +
+                ", walletAddress='" + walletAddress + '\'' +
+                ", lastUpdatedTxHash='" + lastUpdatedTxHash + '\'' +
                 ", createdAt=" + createdAt +
                 ", updatedAt=" + updatedAt +
                 '}';
