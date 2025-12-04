@@ -258,4 +258,4 @@ For questions or support, please contact alprincellavan2019@gmail.com
 
 ---
 
-**Note**: This application uses the Cardano Preview Testnet for blockchain transactions. No real ADA is required for testing.asdsdasdasas
+**Note**: This application uses the Cardano Preview Testnet for blockchain transactions. No real ADA is required for testing.
