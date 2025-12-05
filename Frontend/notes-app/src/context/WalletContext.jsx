@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { Core } from "@blaze-cardano/sdk";
 
 const WalletContext = createContext(null);
 
@@ -51,10 +52,23 @@ export const WalletProvider = ({ children }) => {
             const unusedAddresses = await api.getUnusedAddresses();
             const usedAddresses = await api.getUsedAddresses();
 
+            let addressHex = null;
             if (usedAddresses.length > 0) {
-                setWalletAddress(usedAddresses[0]);
-            }else if (unusedAddresses.length > 0) {
-                setWalletAddress(unusedAddresses[0]);
+                addressHex = usedAddresses[0];
+            } else if (unusedAddresses.length > 0) {
+                addressHex = unusedAddresses[0];
+            }
+
+            // Convert hex address to bech32 format
+            if (addressHex) {
+                try {
+                    const bech32Address = Core.Address.fromBytes(Core.HexBlob(addressHex)).toBech32();
+                    setWalletAddress(bech32Address);
+                } catch (conversionErr) {
+                    console.error("Address conversion error:", conversionErr);
+                    // If already in bech32 format, use as-is
+                    setWalletAddress(addressHex);
+                }
             }
 
             localStorage.setItem("connectedWallet", walletName);

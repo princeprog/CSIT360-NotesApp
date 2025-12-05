@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Star, Trash2, Edit3, Clock, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
-import { useNotes } from '../context/NotesContext';
+import { Star, Trash2, Edit3, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { getStatusColor, getStatusText } from '../config/blockchain';
 
 const NoteCard = ({ 
   note, 
@@ -11,10 +11,9 @@ const NoteCard = ({
   onOpen,
 }) => {
   const [hovered, setHovered] = useState(false);
-  const { getNoteBlockchainStatus } = useNotes();
   
-  // Get blockchain status for this note
-  const blockchainStatus = getNoteBlockchainStatus(note.id);
+  // Get blockchain status from note object (comes from backend)
+  const blockchainStatus = note.status?.toLowerCase() || "none";
 
   return (
     <>
@@ -78,24 +77,12 @@ const NoteCard = ({
             {/* Blockchain Status Indicator */}
             {blockchainStatus !== "none" && (
               <div className="flex items-center gap-1">
-                {blockchainStatus === "pending" && (
-                  <span className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-600 rounded-full">
-                    <Clock size={12} className="animate-pulse" />
-                    <span>Pending</span>
-                  </span>
-                )}
-                {blockchainStatus === "confirmed" && (
-                  <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-600 rounded-full">
-                    <CheckCircle size={12} />
-                    <span>Confirmed</span>
-                  </span>
-                )}
-                {blockchainStatus === "failed" && (
-                  <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-full">
-                    <AlertCircle size={12} />
-                    <span>Failed</span>
-                  </span>
-                )}
+                <span className={`flex items-center gap-1 px-2 py-1 rounded-full ${getStatusColor(blockchainStatus)}`}>
+                  {blockchainStatus === "pending" && <Clock size={12} className="animate-pulse" />}
+                  {blockchainStatus === "confirmed" && <CheckCircle size={12} />}
+                  {blockchainStatus === "failed" && <AlertCircle size={12} />}
+                  <span>{getStatusText(blockchainStatus)}</span>
+                </span>
               </div>
             )}
           </div>

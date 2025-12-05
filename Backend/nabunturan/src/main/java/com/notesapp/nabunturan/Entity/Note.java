@@ -18,6 +18,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 @Entity
 @Table(name = "notes", indexes = {
@@ -32,15 +34,19 @@ public class Note {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank(message = "Title is required")
+    @Size(min = 1, max = 255, message = "Title must be between 1 and 255 characters")
     @Column(nullable = false, length = 255)
     private String title;
 
+    @Size(max = 10000, message = "Content must not exceed 10000 characters")
     @Column(columnDefinition = "TEXT")
     private String content;
 
     @Column(nullable = false)
     private boolean isPinned;
 
+    @Size(max = 100, message = "Category must not exceed 100 characters")
     @Column(length = 100)
     private String category;
 

@@ -117,12 +117,14 @@ public class TransactionService {
     }
 
     /**
-     * Get transactions for a wallet address with pagination
+     * Get transactions for a wallet address with pagination (deprecated - use Pageable version)
      * @param walletAddress The wallet address
      * @param page The page number (0-indexed)
      * @param size The page size
      * @return Page of transactions
+     * @deprecated Use getTransactionsByWalletAddress(String, Pageable) instead
      */
+    @Deprecated
     public Page<Transaction> getTransactionsByWalletAddress(String walletAddress, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         return transactionRepository.findByWalletAddressOrderByCreatedAtDesc(walletAddress, pageable);
@@ -189,5 +191,64 @@ public class TransactionService {
         }
 
         return transactionRepository.save(transaction);
+    }
+
+    /**
+     * Get transaction by transaction hash
+     * @param txHash The transaction hash
+     * @return The transaction
+     */
+    public Transaction getTransactionByTxHash(String txHash) {
+        return transactionRepository.findByTxHash(txHash)
+                .orElseThrow(() -> new RuntimeException("Transaction not found with hash: " + txHash));
+    }
+
+    /**
+     * Get all transactions
+     * @return List of all transactions
+     */
+    public List<Transaction> getAllTransactions() {
+        return transactionRepository.findAll();
+    }
+
+    /**
+     * Get transactions by status
+     * @param status The transaction status
+     * @return List of transactions with the given status
+     */
+    public List<Transaction> getTransactionsByStatus(String status) {
+        return transactionRepository.findByStatus(status);
+    }
+
+    /**
+     * Get transactions by wallet address (non-paginated)
+     * @param walletAddress The wallet address
+     * @return List of transactions
+     */
+    public List<Transaction> getTransactionsByWalletAddress(String walletAddress) {
+        return transactionRepository.findByWalletAddress(walletAddress);
+    }
+
+    /**
+     * Get transactions by wallet address with pagination
+     * @param walletAddress The wallet address
+     * @param pageable The pageable object
+     * @return Page of transactions
+     */
+    public Page<Transaction> getTransactionsByWalletAddress(String walletAddress, Pageable pageable) {
+        return transactionRepository.findByWalletAddressOrderByCreatedAtDesc(walletAddress, pageable);
+    }
+
+    /**
+     * Get transactions by status and wallet address
+     * @param status The transaction status
+     * @param walletAddress The wallet address
+     * @return List of transactions
+     */
+    public List<Transaction> getTransactionsByStatusAndWalletAddress(String status, String walletAddress) {
+        List<Transaction> allTransactions = transactionRepository.findByWalletAddress(walletAddress);
+        return allTransactions.stream()
+                .filter(tx -> status.equalsIgnoreCase(tx.getStatus()))
+                .toList();
     }
 }

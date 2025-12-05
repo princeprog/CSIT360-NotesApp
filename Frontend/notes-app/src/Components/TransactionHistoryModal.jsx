@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { X, ExternalLink, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { useBlockchain } from '../context/BlockchainContext';
+import { getStatusColor, getStatusText, getExplorerUrl } from '../config/blockchain';
 
-const TransactionHistoryModal = ({ isOpen, onClose }) => {
-  const { transactionHistory } = useBlockchain();
+const TransactionHistoryModal = ({ isOpen, onClose, transactionHistory = [] }) => {
   const [filter, setFilter] = useState('all'); // 'all', 'pending', 'confirmed', 'failed'
 
   if (!isOpen) return null;
@@ -129,10 +128,11 @@ const TransactionHistoryModal = ({ isOpen, onClose }) => {
                       <span className="text-gray-500">Transaction:</span>
                       <span className="font-mono">{truncateHash(tx.txHash)}</span>
                       <a 
-                        href={`https://preview.cexplorer.io/tx/${tx.txHash}`}
+                        href={getExplorerUrl(tx.txHash)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:text-blue-700"
+                        title="View on CardanoScan"
                       >
                         <ExternalLink size={14} />
                       </a>
