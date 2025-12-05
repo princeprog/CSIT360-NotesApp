@@ -161,24 +161,29 @@ function Home() {
       <div
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } transform transition-transform duration-300 ease-in-out fixed md:relative bg-white h-full shadow-xl z-50 w-[36rem] md:w-[30rem] md:translate-x-0 border-r-2 border-gray-300 overflow-y-auto`}
+        } transform transition-transform duration-300 ease-in-out fixed md:relative bg-gradient-to-b from-slate-50 to-white h-full shadow-2xl z-50 w-[320px] md:w-[280px] md:translate-x-0 border-r border-slate-200 overflow-y-auto`}
       >
         {/* Header Section */}
-        <div className="sticky top-0 z-10 p-6 border-b-2 border-gray-300 bg-white shadow-sm">
+        <div className="sticky top-0 z-10 p-6 bg-white/80 backdrop-blur-md border-b border-slate-200">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Edit3 size={20} className="text-white" />
+              <div className="w-11 h-11 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <Edit3 size={22} className="text-white" strokeWidth={2.5} />
               </div>
-              <h1 className="text-lg font-bold text-gray-900">
-                Saint Nabunturan Notes
-              </h1>
+              <div className="flex flex-col">
+                <h1 className="text-sm font-bold text-slate-800 leading-tight">
+                  Notes App
+                </h1>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Powered by Cardano
+                </span>
+              </div>
             </div>
             {isMobile && (
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />
               </button>
@@ -188,19 +193,19 @@ function Home() {
           {/* New Note Button */}
           <button
             onClick={openCreateModal}
-            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl py-4 flex items-center justify-center gap-2 hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl py-3.5 flex items-center justify-center gap-2.5 hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 font-semibold text-sm hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Plus size={20} />
-            New Note
+            <Plus size={20} strokeWidth={2.5} />
+            Create Note
           </button>
         </div>
 
         {/* Categories Section */}
-        <div className="p-6 bg-white">
+        <div className="px-4 py-6">
           {/* Categories */}
           <div className="mb-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-4 px-2 border-b-2 border-gray-200 pb-2">
-              Categories
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-3">
+              Navigation
             </h3>
             <div className="space-y-1">
               {["All Notes", "History", ...categories.filter(c => c !== "All Notes")].map(
@@ -211,6 +216,8 @@ function Home() {
                       : category === "History"
                       ? history.length
                       : notes.filter((note) => note.category === category).length;
+                  const isActive = activeCategory === category;
+                  
                   return (
                     <button
                       key={category}
@@ -218,24 +225,28 @@ function Home() {
                         setActiveCategory(category);
                         if (isMobile) setSidebarOpen(false);
                       }}
-                      className={`w-full text-left py-3 px-4 rounded-xl flex items-center justify-between transition-all ${
-                        activeCategory === category
-                          ? "bg-blue-50 text-blue-700 font-semibold shadow-sm"
-                          : "hover:bg-gray-50 text-gray-600"
+                      className={`group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20"
+                          : "hover:bg-slate-100 text-slate-700 hover:text-slate-900"
                       }`}
                     >
-                      <span className="text-sm">{category}</span>
+                      <span className={`text-sm font-medium ${isActive ? 'font-semibold' : ''}`}>
+                        {category}
+                      </span>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-xs px-2 py-1 rounded-full font-medium ${
-                            activeCategory === category
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-gray-100 text-gray-500"
+                          className={`text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-slate-200 text-slate-600 group-hover:bg-slate-300"
                           }`}
                         >
                           {count}
                         </span>
-                        {activeCategory === category && <ChevronRight size={16} />}
+                        {isActive && (
+                          <ChevronRight size={16} className="text-white" strokeWidth={2.5} />
+                        )}
                       </div>
                     </button>
                   );
@@ -245,10 +256,15 @@ function Home() {
           </div>
         </div>
 
-        {/* Wallet Section */}
-        <div className="border-t-4 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
-          <div className="p-6">
-            <WalletConnect />
+        {/* Wallet Section - Sticky at Bottom */}
+        <div className="mt-auto border-t border-slate-200 bg-gradient-to-br from-slate-50 to-white">
+          <div className="p-4">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-2">
+              Blockchain
+            </h3>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+              <WalletConnect />
+            </div>
           </div>
         </div>
       </div>

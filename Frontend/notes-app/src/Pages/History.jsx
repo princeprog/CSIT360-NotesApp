@@ -1,12 +1,33 @@
 import { useNotes } from "../context/NotesContext";
-import { useBlockchain } from "../context/BlockchainContext";
 import { Clock, ArrowLeft, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { useWallet } from "../context/WalletContext";
+import { getStatusColor, getStatusText, getExplorerUrl } from "../config/blockchain";
 
 function History() {
   const navigate = useNavigate();
   const { history } = useNotes();
-  const { transactionHistory } = useBlockchain();
+  const { walletAddress } = useWallet();
+  const [transactionHistory, setTransactionHistory] = useState([]);
+  
+  // Fetch transaction history from backend
+  useEffect(() => {
+    const fetchTransactionHistory = async () => {
+      if (!walletAddress) return;
+      
+      try {
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+        const response = await axios.get(`${apiUrl}/transactions/wallet/${walletAddress}`);
+        setTransactionHistory(response.data.content || response.data || []);
+      } catch (err) {
+        console.error("Failed to fetch transaction history:", err);
+      }
+    };
+    
+    fetchTransactionHistory();
+  }, [walletAddress]);
   
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString();
@@ -80,16 +101,16 @@ function History() {
             <div className="space-y-4">
               {transactionHistory.map((tx) => (
                 <div
-                  key={tx.txHash}
-                  className={`p-4 bg-white rounded-xl shadow border-l-4 ${tx.status === 'pending' ? 'border-amber-400' : tx.status === 'confirmed' ? 'border-green-400' : 'border-red-400'}`}
+                  key={tx.txHash || tx.id}
+                  className={`p-4 bg-white rounded-xl shadow border-l-4 ${tx.status === 'PENDING' || tx.status === 'pending' ? 'border-amber-400' : tx.status === 'CONFIRMED' || tx.status === 'confirmed' ? 'border-green-400' : 'border-red-400'}`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      {getStatusIcon(tx.status)}
-                      <span className="font-semibold">{tx.action} Note</span>
+                      {getStatusIcon(tx.status?.toLowerCase())}
+                      <span className="font-semibold">{tx.operation || tx.action} Note</span>
                     </div>
                     <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                      {tx.status.toUpperCase()}
+                      {(tx.status || '').toUpperCase()}
                     </span>
                   </div>
                   
@@ -98,10 +119,11 @@ function History() {
                       <span className="text-gray-500">Transaction:</span>
                       <span className="font-mono">{truncateHash(tx.txHash)}</span>
                       <a
-                        href={`https://preview.cexplorer.io/tx/${tx.txHash}`}
+                        href={getExplorerUrl(tx.txHash)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:text-blue-700"
+                        title="View on CardanoScan"
                       >
                         <ExternalLink size={14} />
                       </a>
@@ -112,8 +134,8 @@ function History() {
                   </div>
                   
                   <div className="text-xs text-gray-500">
-                    {formatDate(tx.timestamp)}
-                    {tx.status === 'confirmed' && tx.confirmedAt && (
+                    {formatDate(tx.createdAt || tx.timestamp)}
+                    {(tx.status === 'CONFIRMED' || tx.status === 'confirmed') && tx.confirmedAt && (
                       <span className="ml-2">
                         • Confirmed at {formatDate(tx.confirmedAt)}
                       </span>
