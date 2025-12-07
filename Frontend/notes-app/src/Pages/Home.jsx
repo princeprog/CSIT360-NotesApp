@@ -12,7 +12,10 @@ import NoteCard from "../Components/NoteCard";
 import NoteForm from "../Components/NoteForm";
 import DeleteConfirmationModal from "../Components/DeleteConfirmationModal";
 import WalletConnect from "../Components/WalletConnect";
+import TransactionProgress from "../Components/TransactionProgress";
+import TransactionNotifications from "../Components/TransactionNotifications";
 import { useNotes } from "../context/NotesContext";
+import useStatusPolling from "../hooks/useStatusPolling";
 
 function Home() {
   const {
@@ -25,7 +28,18 @@ function Home() {
     togglePin,
     searchNotes,
     history,
+    isProcessing,
+    currentStep,
+    currentTxHash,
   } = useNotes();
+
+  // Initialize status polling hook
+  const { 
+    isPolling, 
+    pendingCount, 
+    notifications, 
+    dismissNotification 
+  } = useStatusPolling();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All Notes");
@@ -296,6 +310,18 @@ function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Pending Transactions Indicator */}
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="relative">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  </div>
+                  <span className="text-xs font-medium text-blue-700">
+                    {pendingCount} pending
+                  </span>
+                </div>
+              )}
+              
               <div className="text-sm text-gray-600 hidden sm:block">
                 {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
               </div>
@@ -440,6 +466,18 @@ function Home() {
         onClose={closeDeleteModal}
         onConfirm={handleDeleteNote}
         noteTitle={noteToDelete?.title || ""}
+      />
+
+      {/* Transaction Progress Overlay */}
+      <TransactionProgress 
+        currentStep={currentStep} 
+        txHash={currentTxHash} 
+      />
+
+      {/* Transaction Status Notifications */}
+      <TransactionNotifications
+        notifications={notifications}
+        onDismiss={dismissNotification}
       />
     </div>
   );

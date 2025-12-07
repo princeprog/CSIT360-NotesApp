@@ -141,6 +141,18 @@ public class NotesController {
     }
 
     /**
+     * GET /api/notes/{id}/status - Get note status and transaction details
+     * @param id Note ID
+     * @return NoteWithStatusResponse with transaction statistics
+     */
+    @GetMapping("/{id}/status")
+    public ResponseEntity<NoteWithStatusResponse> getNoteStatus(@PathVariable Long id) {
+        Note note = notesService.getNoteById(id);
+        NoteWithStatusResponse response = NoteWithStatusResponse.fromEntity(note);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
      * PATCH /api/notes/{id}/toggle-pin - Toggle pin status of a note
      * @param id Note ID
      * @return NoteWithStatusResponse

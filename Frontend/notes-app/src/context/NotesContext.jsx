@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Blockfrost, WebWallet, Blaze, Core } from "@blaze-cardano/sdk";
 import { useWallet } from './WalletContext';
@@ -21,6 +21,12 @@ export const NotesProvider = ({ children }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Transaction progress tracking state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(null);
+  const [currentTxHash, setCurrentTxHash] = useState(null);
+  
   const { walletApi, walletAddress } = useWallet();
 
   // ✅ Add History Entry
@@ -85,6 +91,9 @@ export const NotesProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
+      setIsProcessing(true);
+      setCurrentStep(1); // Step 1: Validating wallet
+      setCurrentTxHash(null);
       
       // Check if wallet is connected with detailed logging
       console.log('🔍 Wallet check - API:', !!walletApi, 'Address:', walletAddress);
@@ -96,6 +105,8 @@ export const NotesProvider = ({ children }) => {
       }
       
       console.log("🔗 Wallet connected:", walletAddress);
+      
+      setCurrentStep(2); // Step 2: Connecting to blockchain
       
       // Step 1: Build and submit blockchain transaction FIRST
       const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
@@ -129,6 +140,9 @@ export const NotesProvider = ({ children }) => {
           
           const blaze = await Promise.race([blazePromise, timeoutPromise]);
           console.log('✅ Blaze initialized successfully');
+
+          setCurrentStep(3); // Step 3: Building transaction
+          setCurrentStep(4); // Step 4: Preparing metadata
 
           // Build chunked metadata for backend storage
           const chunkedMetadata = chunkMetadata({
@@ -219,10 +233,16 @@ export const NotesProvider = ({ children }) => {
           // STEP 7: ATTACH METADATA TO TRANSACTION
           tx.setMetadata(finalMetadata);
 
+          setCurrentStep(5); // Step 5: Calculating fees
           // BUILD, SIGN, AND SUBMIT THE TRANSACTION (following instructor's pattern)
           const completedTx = await tx.complete();
+          
+          setCurrentStep(6); // Step 6: Signing transaction
           const signedTx = await blaze.signTransaction(completedTx);
+          
+          setCurrentStep(7); // Step 7: Submitting to blockchain
           txHash = await blaze.provider.postTransactionToChain(signedTx);
+          setCurrentTxHash(txHash);
           
           console.log("✅ Transaction submitted:", txHash);
         } catch (blockchainErr) {
@@ -237,6 +257,8 @@ export const NotesProvider = ({ children }) => {
       } else {
         throw new Error("Blockfrost project ID not configured. Please set VITE_BLOCKFROST_PROJECT_ID in your .env file.");
       }
+      
+      setCurrentStep(8); // Step 8: Saving to database
       
       // Step 2: Save to backend with transaction hash
       const noteToCreate = {
@@ -254,9 +276,13 @@ export const NotesProvider = ({ children }) => {
       const response = await axios.post(API_URL, noteToCreate);
       const createdNote = response.data;
 
+      setCurrentStep(9); // Step 9: Monitoring confirmation
+      
       // Update local state
       setNotes(prev => [createdNote, ...prev]);
       addHistory("CREATED", createdNote);
+      
+      setCurrentStep(10); // Step 10: Complete
       
       return createdNote;
     } catch (err) {
@@ -269,6 +295,12 @@ export const NotesProvider = ({ children }) => {
       throw new Error(errorMsg);
     } finally {
       setLoading(false);
+      setIsProcessing(false);
+      // Reset progress after a short delay to allow users to see "Complete"
+      setTimeout(() => {
+        setCurrentStep(null);
+        setCurrentTxHash(null);
+      }, 2000);
     }
   };
 
@@ -658,18 +690,126 @@ export const NotesProvider = ({ children }) => {
     }
   };
 
+  // Refresh notes from backend - wrap in useCallback to prevent recreating polling interval
+  const refreshNotes = useCallback(async () => {
+    try {
+      console.log('🔄 Refreshing notes from backend...');
+      const response = await axios.get(API_URL);
+      console.log('✅ Notes refreshed, total:', response.data.length);
+      
+      // Log status breakdown
+      const statusCount = response.data.reduce((acc, note) => {
+        acc[note.status || 'NO_STATUS'] = (acc[note.status || 'NO_STATUS'] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📊 Status breakdown:', statusCount);
+      
+      setNotes(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Failed to refresh notes:', error);
+      return []; // Return empty array if refresh fails
+    }
+  }, []); // Empty deps - only uses setNotes which is stable
+
+  // Get notes by status
+  const getNotesByStatus = async (status) => {
+    try {
+      const res = await axios.get(`${API_URL}/status/${status}`);
+      return res.data;
+    } catch (error) {
+      console.error(`Failed to get notes by status ${status}:`, error);
+      return [];
+    }
+  };
+
+  // Get all pending notes
+  const getPendingNotes = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/pending`);
+      return res.data;
+    } catch (error) {
+      console.error('Failed to get pending notes:', error);
+      return [];
+    }
+  };
+
+  // Get transaction status for a specific note
+  const getTransactionStatus = async (noteId) => {
+    try {
+      const res = await axios.get(`${API_URL}/${noteId}/status`);
+      const statusData = res.data;
+      
+      // If status is confirmed, update local state immediately
+      if (statusData && statusData.status === 'CONFIRMED') {
+        setNotes(prev => prev.map(n => 
+          n.id === noteId 
+            ? { ...n, status: 'CONFIRMED', confirmed: true }
+            : n
+        ));
+      }
+      
+      return statusData;
+    } catch (error) {
+      console.error(`Failed to get transaction status for note ${noteId}:`, error);
+      return null;
+    }
+  };
+
+  // Get transaction history
+  const getTransactionHistory = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/transactions/history`);
+      return res.data;
+    } catch (error) {
+      console.error('Failed to get transaction history:', error);
+      return [];
+    }
+  };
+
+  // Retry failed transaction
+  const retryFailedTransaction = async (noteId) => {
+    try {
+      const res = await axios.post(`${API_URL}/${noteId}/retry`);
+      
+      if (res.data.success) {
+        // Update note with new transaction hash
+        setNotes(prev => prev.map(n => 
+          n.id === noteId 
+            ? { ...n, txHash: res.data.newTxHash, status: 'PENDING' }
+            : n
+        ));
+      }
+      
+      return res.data;
+    } catch (error) {
+      console.error(`Failed to retry transaction for note ${noteId}:`, error);
+      return { success: false, error: error.message };
+    }
+  };
+
+
   const value = useMemo(() => ({
     notes,
     history,
     loading,
     error,
+    isProcessing,
+    currentStep,
+    currentTxHash,
     createNote,
     updateNote,
     deleteNote,
     togglePin,
     getNoteById,
     searchNotes,
-  }), [notes, history, loading, error, walletApi, walletAddress]);
+    refreshNotes,
+    getNotesByStatus,
+    getPendingNotes,
+    getTransactionStatus,
+    getTransactionHistory,
+    retryFailedTransaction,
+  }), [notes, history, loading, error, isProcessing, currentStep, currentTxHash, walletApi, walletAddress]);
 
   return (
     <NotesContext.Provider value={value}>
