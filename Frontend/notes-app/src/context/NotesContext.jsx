@@ -86,9 +86,13 @@ export const NotesProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      // Check if wallet is connected
+      // Check if wallet is connected with detailed logging
+      console.log('🔍 Wallet check - API:', !!walletApi, 'Address:', walletAddress);
       if (!walletApi || !walletAddress) {
-        throw new Error("Please connect your wallet before creating a note.");
+        const missingItems = [];
+        if (!walletApi) missingItems.push('wallet API');
+        if (!walletAddress) missingItems.push('wallet address');
+        throw new Error(`Please connect your wallet before creating a note. Missing: ${missingItems.join(', ')}`);
       }
       
       console.log("🔗 Wallet connected:", walletAddress);
@@ -97,12 +101,34 @@ export const NotesProvider = ({ children }) => {
       const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
       if (projectId) {
         try {
+          console.log('🔗 Initializing Blockfrost provider...');
+          console.log('📍 Network:', BLOCKCHAIN_CONFIG.NETWORK);
+          console.log('🔑 Project ID:', projectId.substring(0, 10) + '...');
+          
+          // Blockfrost expects format 'cardano-preview', not just 'preview'
+          const networkName = BLOCKCHAIN_CONFIG.NETWORK.startsWith('cardano-') 
+            ? BLOCKCHAIN_CONFIG.NETWORK 
+            : `cardano-${BLOCKCHAIN_CONFIG.NETWORK}`;
+          
+          console.log('🌐 Using Blockfrost network:', networkName);
+          
           const provider = new Blockfrost({ 
-            network: BLOCKCHAIN_CONFIG.NETWORK, 
+            network: networkName, 
             projectId 
           });
+          
           const wallet = new WebWallet(walletApi);
-          const blaze = await Blaze.from(provider, wallet);
+          console.log('🔗 Connecting to Blaze with Blockfrost...');
+          console.log('⏳ This may take a few seconds...');
+          
+          // Add timeout to detect hanging requests
+          const blazePromise = Blaze.from(provider, wallet);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Blockfrost connection timeout after 30 seconds')), 30000)
+          );
+          
+          const blaze = await Promise.race([blazePromise, timeoutPromise]);
+          console.log('✅ Blaze initialized successfully');
 
           // Build chunked metadata for backend storage
           const chunkedMetadata = chunkMetadata({
@@ -125,41 +151,43 @@ export const NotesProvider = ({ children }) => {
           const metadatumMap = new Core.MetadatumMap();
 
           // STEP 3: INSERT KEY-VALUE PAIRS
-          // ACTION
-          metadatumMap.insert(
-            Core.Metadatum.newText("action"),
-            Core.Metadatum.newText("CREATE")
-          );
-
-          // TITLE (with chunking support)
+          
+          // Helper to format content (handles both strings and arrays)
           const formatContent = (content) => {
-            if (!content || content.length <= BLOCKCHAIN_CONFIG.MAX_METADATA_CHUNK_SIZE) {
-              return Core.Metadatum.newText(content || "");
+            // If content is already chunked (array), create a list
+            if (Array.isArray(content)) {
+              const list = new Core.MetadatumList();
+              content.forEach(chunk => {
+                list.add(Core.Metadatum.newText(chunk));
+              });
+              return Core.Metadatum.newList(list);
             }
-            const chunkSize = BLOCKCHAIN_CONFIG.MAX_METADATA_CHUNK_SIZE;
-            const chunks = content.match(new RegExp(`.{1,${chunkSize}}`, 'g')) || [];
-            const list = new Core.MetadatumList();
-            chunks.forEach(chunk => {
-              list.add(Core.Metadatum.newText(chunk));
-            });
-            return Core.Metadatum.newList(list);
+            // If content is a string, use it directly
+            return Core.Metadatum.newText(content || "");
           };
 
+          // ACTION
           metadatumMap.insert(
             Core.Metadatum.newText("action"),
             Core.Metadatum.newText(TRANSACTION_OPERATIONS.CREATE)
           );
 
-          // CONTENT (with chunking support)
+          // TITLE (use chunked version)
           metadatumMap.insert(
-            Core.Metadatum.newText("content"),
-            formatContent(noteData.content || "")
+            Core.Metadatum.newText("title"),
+            formatContent(chunkedMetadata.title)
           );
 
-          // CATEGORY
+          // CONTENT (use chunked version)
+          metadatumMap.insert(
+            Core.Metadatum.newText("content"),
+            formatContent(chunkedMetadata.content)
+          );
+
+          // CATEGORY (use chunked version)
           metadatumMap.insert(
             Core.Metadatum.newText("category"),
-            Core.Metadatum.newText(noteData.category || "Personal")
+            formatContent(chunkedMetadata.category)
           );
 
           // TIMESTAMP
@@ -253,20 +281,39 @@ export const NotesProvider = ({ children }) => {
 
     try {
       setLoading(true);
+      setError(null);
       
-      // Step 1: Build and submit blockchain transaction FIRST (if wallet connected)
-      if (walletApi && walletAddress) {
-        const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
-        if (projectId) {
-          try {
-            const provider = new Blockfrost({ 
-              network: BLOCKCHAIN_CONFIG.NETWORK, 
-              projectId 
-            });
-            const wallet = new WebWallet(walletApi);
-            const blaze = await Blaze.from(provider, wallet);
+      // Check if wallet is connected with detailed logging
+      console.log('🔍 UPDATE - Wallet check - API:', !!walletApi, 'Address:', walletAddress);
+      if (!walletApi || !walletAddress) {
+        const missingItems = [];
+        if (!walletApi) missingItems.push('wallet API');
+        if (!walletAddress) missingItems.push('wallet address');
+        throw new Error(`Please connect your wallet before updating a note. Missing: ${missingItems.join(', ')}`);
+      }
+      
+      console.log("🔗 UPDATE - Wallet connected:", walletAddress);
+      
+      // Step 1: Build and submit blockchain transaction FIRST
+      const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
+      if (!projectId) {
+        throw new Error('Blockfrost project ID not configured.');
+      }
+      
+      try {
+        console.log('🔗 Initializing Blockfrost for UPDATE...');
+        const networkName = BLOCKCHAIN_CONFIG.NETWORK.startsWith('cardano-') 
+          ? BLOCKCHAIN_CONFIG.NETWORK 
+          : `cardano-${BLOCKCHAIN_CONFIG.NETWORK}`;
+        
+        const provider = new Blockfrost({ 
+          network: networkName, 
+          projectId 
+        });
+        const wallet = new WebWallet(walletApi);
+        const blaze = await Blaze.from(provider, wallet);
 
-            // Build chunked metadata
+            // Build chunked metadata for backend storage
             const chunkedMetadata = chunkMetadata({
               id,
               title: noteData.title,
@@ -278,42 +325,108 @@ export const NotesProvider = ({ children }) => {
             validateChunkedMetadata(chunkedMetadata);
             metadataJson = JSON.stringify(chunkedMetadata);
 
-            // Build transaction - send to own wallet address
-            let txBuilder = blaze
-              .newTransaction()
+            // --- BUILD BLOCKCHAIN METADATA (SAME AS CREATE) ---
+            const metadata = new Map();
+            const label = BLOCKCHAIN_CONFIG.METADATA_LABEL;
+            const metadatumMap = new Core.MetadatumMap();
+
+            // Helper to format content (handles both strings and arrays)
+            const formatContent = (content) => {
+              // If content is already chunked (array), create a list
+              if (Array.isArray(content)) {
+                const list = new Core.MetadatumList();
+                content.forEach(chunk => {
+                  list.add(Core.Metadatum.newText(chunk));
+                });
+                return Core.Metadatum.newList(list);
+              }
+              // If content is a string, use it directly
+              return Core.Metadatum.newText(content || "");
+            };
+
+            // ACTION
+            metadatumMap.insert(
+              Core.Metadatum.newText("action"),
+              Core.Metadatum.newText(TRANSACTION_OPERATIONS.UPDATE)
+            );
+
+            // NOTE ID
+            metadatumMap.insert(
+              Core.Metadatum.newText("noteId"),
+              Core.Metadatum.newText(String(id))
+            );
+
+            // TITLE (use chunked version)
+            metadatumMap.insert(
+              Core.Metadatum.newText("title"),
+              formatContent(chunkedMetadata.title)
+            );
+
+            // CONTENT (use chunked version)
+            metadatumMap.insert(
+              Core.Metadatum.newText("content"),
+              formatContent(chunkedMetadata.content)
+            );
+
+            // CATEGORY (use chunked version)
+            metadatumMap.insert(
+              Core.Metadatum.newText("category"),
+              formatContent(chunkedMetadata.category)
+            );
+
+            // TIMESTAMP
+            metadatumMap.insert(
+              Core.Metadatum.newText("timestamp"),
+              Core.Metadatum.newText(new Date().toISOString())
+            );
+
+            const finalMetadata = Core.Metadatum.newMap(metadatumMap);
+            metadata.set(label, finalMetadata);
+
+            // CONVERT TO FINAL METADATA TYPE
+            const wrappedMetadata = new Core.Metadata(metadata);
+
+            // BUILD TRANSACTION
+            const tx = blaze.newTransaction()
               .payLovelace(Core.Address.fromBech32(walletAddress), 1000000n);
 
-            if (txBuilder.addMetadata) {
-              txBuilder = txBuilder.addMetadata({ 1: chunkedMetadata });
-            } else if (txBuilder.withMetadata) {
-              txBuilder = txBuilder.withMetadata({ 1: chunkedMetadata });
-            }
+            tx.setMetadata(wrappedMetadata);
 
-            const builtTx = await txBuilder.complete();
-            const result = await signAndSubmitTransaction(builtTx, walletApi);
-            txHash = result.txHash;
-            
-            console.log("Transaction submitted:", txHash);
-          } catch (blockchainErr) {
-            logTransactionError(blockchainErr, { 
-              operation: TRANSACTION_OPERATIONS.UPDATE,
-              noteId: id,
-              walletAddress 
-            });
-            console.error("Blockchain transaction failed:", handleTransactionError(blockchainErr, 'UPDATE'));
-          }
-        }
+        const completedTx = await tx.complete();
+        const signedTx = await blaze.signTransaction(completedTx);
+        txHash = await blaze.provider.postTransactionToChain(signedTx);
+        
+        console.log("✅ UPDATE Transaction submitted:", txHash);
+      } catch (blockchainErr) {
+        logTransactionError(blockchainErr, { 
+          operation: TRANSACTION_OPERATIONS.UPDATE,
+          noteId: id,
+          walletAddress 
+        });
+        const errorMsg = handleTransactionError(blockchainErr, 'UPDATE');
+        throw new Error(errorMsg);
       }
 
-      // Step 2: Update in backend
+      // Step 2: Update in backend (only if blockchain transaction succeeded)
+      console.log('📝 Updating note with request:', {
+        id,
+        title: noteData.title,
+        txHash,
+        walletAddress
+      });
+      
+      if (!txHash || !walletAddress || !metadataJson) {
+        throw new Error('Missing required fields: txHash, walletAddress, or metadataJson');
+      }
+      
       const response = await axios.put(`${API_URL}/${id}`, {
         title: noteData.title,
         content: noteData.content,
         category: noteData.category,
         isPinned: noteData.isPinned,
-        txHash: txHash || null,
-        walletAddress: walletAddress || null,
-        metadataJson: metadataJson || null
+        txHash: txHash,
+        walletAddress: walletAddress,
+        metadataJson: metadataJson
       });
 
       setNotes(prev => prev.map(n => n.id === id ? response.data : n));
@@ -321,8 +434,14 @@ export const NotesProvider = ({ children }) => {
 
       return response.data;
     } catch (err) {
-      setError("Failed to update note.");
-      return null;
+      logTransactionError(err, { 
+        operation: TRANSACTION_OPERATIONS.UPDATE,
+        noteId: id,
+        walletAddress 
+      });
+      const errorMsg = err.message || handleTransactionError(err, 'UPDATE');
+      setError(errorMsg);
+      throw new Error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -338,57 +457,139 @@ export const NotesProvider = ({ children }) => {
 
     try {
       setLoading(true);
+      setError(null);
       
-      // Step 1: Build and submit blockchain transaction FIRST (if wallet connected)
-      if (walletApi && walletAddress && existingNote) {
-        const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
-        if (projectId) {
-          try {
-            const provider = new Blockfrost({ 
-              network: BLOCKCHAIN_CONFIG.NETWORK, 
-              projectId 
-            });
-            const wallet = new WebWallet(walletApi);
-            const blaze = await Blaze.from(provider, wallet);
+      // Check if wallet is connected with detailed logging
+      console.log('🔍 DELETE - Wallet check - API:', !!walletApi, 'Address:', walletAddress);
+      if (!walletApi || !walletAddress) {
+        const missingItems = [];
+        if (!walletApi) missingItems.push('wallet API');
+        if (!walletAddress) missingItems.push('wallet address');
+        throw new Error(`Please connect your wallet before deleting a note. Missing: ${missingItems.join(', ')}`);
+      }
+      
+      console.log("🔗 DELETE - Wallet connected:", walletAddress);
+      
+      if (!existingNote) {
+        throw new Error('Note not found.');
+      }
+      
+      // Step 1: Build and submit blockchain transaction FIRST
+      const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
+      if (!projectId) {
+        throw new Error('Blockfrost project ID not configured.');
+      }
+      
+      try {
+        console.log('🔗 Initializing Blockfrost for DELETE...');
+        const networkName = BLOCKCHAIN_CONFIG.NETWORK.startsWith('cardano-') 
+          ? BLOCKCHAIN_CONFIG.NETWORK 
+          : `cardano-${BLOCKCHAIN_CONFIG.NETWORK}`;
+        
+        const provider = new Blockfrost({ 
+          network: networkName, 
+          projectId 
+        });
+        const wallet = new WebWallet(walletApi);
+        const blaze = await Blaze.from(provider, wallet);
 
-            // Build chunked metadata
+            // Build chunked metadata for backend storage
             const chunkedMetadata = chunkMetadata(existingNote, TRANSACTION_OPERATIONS.DELETE);
             validateChunkedMetadata(chunkedMetadata);
             metadataJson = JSON.stringify(chunkedMetadata);
 
-            // Build transaction - send to own wallet address
-            let txBuilder = blaze
-              .newTransaction()
+            // --- BUILD BLOCKCHAIN METADATA (SAME AS CREATE) ---
+            const metadata = new Map();
+            const label = BLOCKCHAIN_CONFIG.METADATA_LABEL;
+            const metadatumMap = new Core.MetadatumMap();
+
+            // Helper to format content (handles both strings and arrays)
+            const formatContent = (content) => {
+              // If content is already chunked (array), create a list
+              if (Array.isArray(content)) {
+                const list = new Core.MetadatumList();
+                content.forEach(chunk => {
+                  list.add(Core.Metadatum.newText(chunk));
+                });
+                return Core.Metadatum.newList(list);
+              }
+              // If content is a string, use it directly
+              return Core.Metadatum.newText(content || "");
+            };
+
+            // ACTION
+            metadatumMap.insert(
+              Core.Metadatum.newText("action"),
+              Core.Metadatum.newText(TRANSACTION_OPERATIONS.DELETE)
+            );
+
+            // NOTE ID
+            metadatumMap.insert(
+              Core.Metadatum.newText("noteId"),
+              Core.Metadatum.newText(String(id))
+            );
+
+            // TITLE (use chunked version - of deleted note for reference)
+            metadatumMap.insert(
+              Core.Metadatum.newText("title"),
+              formatContent(chunkedMetadata.title)
+            );
+
+            // CATEGORY (use chunked version)
+            metadatumMap.insert(
+              Core.Metadatum.newText("category"),
+              formatContent(chunkedMetadata.category)
+            );
+
+            // TIMESTAMP
+            metadatumMap.insert(
+              Core.Metadatum.newText("timestamp"),
+              Core.Metadatum.newText(new Date().toISOString())
+            );
+
+            const finalMetadata = Core.Metadatum.newMap(metadatumMap);
+            metadata.set(label, finalMetadata);
+
+            // CONVERT TO FINAL METADATA TYPE
+            const wrappedMetadata = new Core.Metadata(metadata);
+
+            // BUILD TRANSACTION
+            const tx = blaze.newTransaction()
               .payLovelace(Core.Address.fromBech32(walletAddress), 1000000n);
 
-            if (txBuilder.addMetadata) {
-              txBuilder = txBuilder.addMetadata({ 1: chunkedMetadata });
-            } else if (txBuilder.withMetadata) {
-              txBuilder = txBuilder.withMetadata({ 1: chunkedMetadata });
-            }
+            tx.setMetadata(wrappedMetadata);
 
-            const builtTx = await txBuilder.complete();
-            const result = await signAndSubmitTransaction(builtTx, walletApi);
-            txHash = result.txHash;
-            
-            console.log("Transaction submitted:", txHash);
-          } catch (blockchainErr) {
-            logTransactionError(blockchainErr, { 
-              operation: TRANSACTION_OPERATIONS.DELETE,
-              noteId: id,
-              walletAddress 
-            });
-            console.error("Blockchain transaction failed:", handleTransactionError(blockchainErr, 'DELETE'));
-          }
-        }
+        const completedTx = await tx.complete();
+        const signedTx = await blaze.signTransaction(completedTx);
+        txHash = await blaze.provider.postTransactionToChain(signedTx);
+        
+        console.log("✅ DELETE Transaction submitted:", txHash);
+      } catch (blockchainErr) {
+        logTransactionError(blockchainErr, { 
+          operation: TRANSACTION_OPERATIONS.DELETE,
+          noteId: id,
+          walletAddress 
+        });
+        const errorMsg = handleTransactionError(blockchainErr, 'DELETE');
+        throw new Error(errorMsg);
       }
 
-      // Step 2: Delete from backend
+      // Step 2: Delete from backend (only if blockchain transaction succeeded)
+      console.log('🗑️ Deleting note with request:', {
+        id,
+        txHash,
+        walletAddress
+      });
+      
+      if (!txHash || !walletAddress || !metadataJson) {
+        throw new Error('Missing required fields: txHash, walletAddress, or metadataJson');
+      }
+      
       await axios.delete(`${API_URL}/${id}`, {
         data: {
-          txHash: txHash || null,
-          walletAddress: walletAddress || null,
-          metadataJson: metadataJson || null
+          txHash: txHash,
+          walletAddress: walletAddress,
+          metadataJson: metadataJson
         }
       });
 
@@ -397,8 +598,14 @@ export const NotesProvider = ({ children }) => {
 
       return true;
     } catch (err) {
-      setError("Failed to delete note.");
-      return false;
+      logTransactionError(err, { 
+        operation: TRANSACTION_OPERATIONS.DELETE,
+        noteId: id,
+        walletAddress 
+      });
+      const errorMsg = err.message || handleTransactionError(err, 'DELETE');
+      setError(errorMsg);
+      throw new Error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -462,7 +669,7 @@ export const NotesProvider = ({ children }) => {
     togglePin,
     getNoteById,
     searchNotes,
-  }), [notes, history, loading, error]);
+  }), [notes, history, loading, error, walletApi, walletAddress]);
 
   return (
     <NotesContext.Provider value={value}>

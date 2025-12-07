@@ -28,7 +28,8 @@ const ERROR_MESSAGES = {
   
   // Network Errors
   NETWORK_ERROR: "Network error. Please check your internet connection.",
-  BLOCKFROST_ERROR: "Unable to connect to blockchain. Please try again later.",
+  BLOCKFROST_ERROR: "Unable to connect to Blockfrost API. Please check your internet connection and verify the Blockfrost service is accessible.",
+  BLOCKFROST_FETCH_FAILED: "Failed to reach Blockfrost API. This could be due to network issues, CORS configuration, or Blockfrost service being down. Please check your internet connection and try again.",
   BLOCKFROST_UNAUTHORIZED: "Blockfrost API key is invalid or missing.",
   BLOCKFROST_RATE_LIMIT: "Too many requests. Please wait a moment and try again.",
   
@@ -73,6 +74,13 @@ export const getErrorMessage = (errorCode) => {
     }
     if (message.includes('wallet') && message.includes('not connected')) {
       return ERROR_MESSAGES.WALLET_NOT_CONNECTED;
+    }
+    if (errorCode.name === 'TypeError' && message.includes('failed to fetch')) {
+      const stack = errorCode.stack?.toLowerCase() || '';
+      if (stack.includes('blockfrost')) {
+        return ERROR_MESSAGES.BLOCKFROST_FETCH_FAILED;
+      }
+      return ERROR_MESSAGES.NETWORK_ERROR;
     }
     if (message.includes('blockfrost') || message.includes('api')) {
       return ERROR_MESSAGES.BLOCKFROST_ERROR;
@@ -214,7 +222,24 @@ export const isNetworkError = (error) => {
     message.includes('network') ||
     message.includes('fetch') ||
     message.includes('connection') ||
-    message.includes('timeout')
+    message.includes('timeout') ||
+    error.name === 'TypeError' && message.includes('failed to fetch')
+  );
+};
+
+/**
+ * Check if error is a Blockfrost API error
+ * @param {Error} error - The error object
+ * @returns {boolean} - True if Blockfrost error
+ */
+export const isBlockfrostError = (error) => {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() || '';
+  const stack = error.stack?.toLowerCase() || '';
+  return (
+    message.includes('blockfrost') ||
+    stack.includes('blockfrost') ||
+    (error.name === 'TypeError' && stack.includes('blockfrost'))
   );
 };
 

@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 public class DeleteNoteWithTxRequest {
 
-    @NotNull(message = "Note ID is required")
+    // Note ID is set from path variable, not from request body
     private Long noteId;
 
     @NotNull(message = "Transaction hash is required")

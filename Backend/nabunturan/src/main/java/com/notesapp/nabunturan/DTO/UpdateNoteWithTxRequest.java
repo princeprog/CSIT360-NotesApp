@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 public class UpdateNoteWithTxRequest {
 
-    @NotNull(message = "Note ID is required")
+    // Note ID is set from path variable, not from request body
     private Long noteId;
 
     @Size(min = 1, max = 255, message = "Title must be between 1 and 255 characters")

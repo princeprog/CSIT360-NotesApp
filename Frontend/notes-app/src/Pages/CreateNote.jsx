@@ -49,16 +49,13 @@ function CreateNote() {
       const newNote = await createNote(currentFormData);
       
       if (newNote && newNote.id) {
-        // Only navigate on success
         navigate(`/notes/${newNote.id}`);
       } else {
-        // If no error was thrown but we didn't get a note back
         setError("Failed to create note. Please try again.");
       }
     } catch (err) {
       console.error("Error creating note:", err);
       setError(err.message || "Failed to create note. Please try again.");
-      // Form data is preserved because we're not navigating away
     } finally {
       setIsSubmitting(false); // Always reset submission state
     }

@@ -49,26 +49,45 @@ export const WalletProvider = ({ children }) => {
             setWalletApi(api);
             setSelectedWallet(walletName);
 
-            const unusedAddresses = await api.getUnusedAddresses();
-            const usedAddresses = await api.getUsedAddresses();
-
+            // Try multiple methods to get wallet address
             let addressHex = null;
-            if (usedAddresses.length > 0) {
-                addressHex = usedAddresses[0];
-            } else if (unusedAddresses.length > 0) {
-                addressHex = unusedAddresses[0];
+            
+            // Method 1: Try getChangeAddress (most reliable)
+            try {
+                addressHex = await api.getChangeAddress();
+                console.log('📍 Got address from getChangeAddress()');
+            } catch (e) {
+                console.warn('getChangeAddress() failed:', e.message);
+            }
+
+            // Method 2: Try getUsedAddresses/getUnusedAddresses as fallback
+            if (!addressHex) {
+                const unusedAddresses = await api.getUnusedAddresses();
+                const usedAddresses = await api.getUsedAddresses();
+                console.log('📍 Addresses - Used:', usedAddresses.length, 'Unused:', unusedAddresses.length);
+
+                if (usedAddresses.length > 0) {
+                    addressHex = usedAddresses[0];
+                } else if (unusedAddresses.length > 0) {
+                    addressHex = unusedAddresses[0];
+                }
             }
 
             // Convert hex address to bech32 format
             if (addressHex) {
                 try {
                     const bech32Address = Core.Address.fromBytes(Core.HexBlob(addressHex)).toBech32();
+                    console.log('✅ Wallet address set:', bech32Address);
                     setWalletAddress(bech32Address);
                 } catch (conversionErr) {
                     console.error("Address conversion error:", conversionErr);
                     // If already in bech32 format, use as-is
+                    console.log('✅ Wallet address set (fallback):', addressHex);
                     setWalletAddress(addressHex);
                 }
+            } else {
+                console.error('⚠️ No wallet addresses found! Wallet may not be properly initialized.');
+                throw new Error('Unable to retrieve wallet address. Please ensure your wallet is unlocked and has been set up properly.');
             }
 
             localStorage.setItem("connectedWallet", walletName);
