@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Menu, Star, ChevronRight, Settings, Edit3, X } from 'lucide-react';
+import { Search, Plus, Menu, Star, ChevronRight, Settings, Edit3, X, RefreshCw, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import NoteCard from '../Components/NoteCard';
 import DeleteConfirmationModal from '../Components/DeleteConfirmationModal';
 import { useNotes } from '../context/NotesContext.jsx';
 
 function NotesList() {
   const navigate = useNavigate();
-  const { notes, togglePin, deleteNote } = useNotes();
+  const { notes, togglePin, deleteNote, refreshNotes } = useNotes();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All Notes');
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState(null);
@@ -32,13 +34,42 @@ function NotesList() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const filteredNotes = useMemo(() => (
-    notes.filter(note => 
+  const filteredNotes = useMemo(() => {
+    let filtered = notes.filter(note => 
       (activeCategory === 'All Notes' || note.category === activeCategory) &&
       (note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
        note.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
-  ), [notes, activeCategory, searchTerm]);
+    );
+
+    // Apply status filter
+    if (statusFilter !== 'All') {
+      filtered = filtered.filter(note => {
+        const status = note.status?.toUpperCase() || 'NONE';
+        return status === statusFilter.toUpperCase();
+      });
+    }
+
+    return filtered;
+  }, [notes, activeCategory, searchTerm, statusFilter]);
+
+  // Group notes by status
+  const groupedNotes = useMemo(() => {
+    const pending = filteredNotes.filter(note => note.status?.toUpperCase() === 'PENDING');
+    const confirmed = filteredNotes.filter(note => note.status?.toUpperCase() === 'CONFIRMED');
+    const failed = filteredNotes.filter(note => note.status?.toUpperCase() === 'FAILED');
+    const other = filteredNotes.filter(note => !note.status || !['PENDING', 'CONFIRMED', 'FAILED'].includes(note.status?.toUpperCase()));
+
+    return { pending, confirmed, failed, other };
+  }, [filteredNotes]);
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const pending = notes.filter(note => note.status?.toUpperCase() === 'PENDING').length;
+    const confirmed = notes.filter(note => note.status?.toUpperCase() === 'CONFIRMED').length;
+    const failed = notes.filter(note => note.status?.toUpperCase() === 'FAILED').length;
+    
+    return { pending, confirmed, failed };
+  }, [notes]);
 
   const pinnedNotes = filteredNotes.filter(note => note.pinned);
   const unpinnedNotes = filteredNotes.filter(note => !note.pinned);
@@ -70,6 +101,12 @@ function NotesList() {
   const closeDeleteModal = () => {
     setDeleteModalOpen(false);
     setNoteToDelete(null);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshNotes();
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   return (
@@ -168,34 +205,123 @@ function NotesList() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 z-10">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 md:hidden transition-colors"
-              >
-                <Menu size={24} />
-              </button>
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 md:hidden transition-colors"
+                >
+                  <Menu size={24} />
+                </button>
+                
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search notes..."
+                    className="pl-10 pr-4 py-3 rounded-xl bg-gray-100 focus:bg-white focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all w-64 md:w-80 border-0 text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
               
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search notes..."
-                  className="pl-10 pr-4 py-3 rounded-xl bg-gray-100 focus:bg-white focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all w-64 md:w-80 border-0 text-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                  title="Refresh notes"
+                >
+                  <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+                
+                <div className="text-sm text-gray-600 hidden sm:block">
+                  {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
+                </div>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white font-semibold text-sm">
+                  JD
+                </div>
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-gray-600 hidden sm:block">
-                {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
-              </div>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white font-semibold text-sm">
-                JD
-              </div>
+
+            {/* Status Filter Buttons */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setStatusFilter('All')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  statusFilter === 'All'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+              
+              <button
+                onClick={() => setStatusFilter('Pending')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  statusFilter === 'Pending'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                }`}
+              >
+                <Clock size={14} />
+                Pending
+                {statusCounts.pending > 0 && (
+                  <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    statusFilter === 'Pending'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-amber-200 text-amber-800'
+                  }`}>
+                    {statusCounts.pending}
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setStatusFilter('Confirmed')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  statusFilter === 'Confirmed'
+                    ? 'bg-green-500 text-white shadow-sm'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                <CheckCircle size={14} />
+                Confirmed
+                {statusCounts.confirmed > 0 && (
+                  <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    statusFilter === 'Confirmed'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-green-200 text-green-800'
+                  }`}>
+                    {statusCounts.confirmed}
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setStatusFilter('Failed')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  statusFilter === 'Failed'
+                    ? 'bg-red-500 text-white shadow-sm'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100'
+                }`}
+              >
+                <AlertCircle size={14} />
+                Failed
+                {statusCounts.failed > 0 && (
+                  <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    statusFilter === 'Failed'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-red-200 text-red-800'
+                  }`}>
+                    {statusCounts.failed}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </header>
@@ -229,7 +355,7 @@ function NotesList() {
           ) : (
             <div className="max-w-6xl mx-auto">
               {/* Pinned Notes */}
-              {pinnedNotes.length > 0 && (
+              {pinnedNotes.length > 0 && statusFilter === 'All' && (
                 <div className="mb-8">
                   <h2 className="text-sm font-semibold text-gray-500 mb-4 flex items-center gap-2 uppercase tracking-wider">
                     <Star className="text-amber-500" size={16} fill="currentColor" />
@@ -251,25 +377,121 @@ function NotesList() {
                 </div>
               )}
 
-              {/* All Notes */}
-              <div>
-                <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
-                  {activeCategory === 'All Notes' ? 'All Notes' : activeCategory}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {unpinnedNotes.map(note => (
-                    <NoteCard 
-                      key={note.id} 
-                      note={note} 
-                      onTogglePin={togglePin}
-                      onEdit={(n) => navigate(`/edit/${n.id}`)}
-                      onDelete={(id) => confirmDelete(id)}
-                      formatDate={formatDate}
-                      onOpen={(n) => navigate(`/notes/${n.id}`)}
-                    />
-                  ))}
+              {/* Grouped by Status (when All is selected and notes exist) */}
+              {statusFilter === 'All' ? (
+                <>
+                  {/* Pending Notes - Always at top */}
+                  {groupedNotes.pending.length > 0 && (
+                    <div className="mb-8">
+                      <h2 className="text-sm font-semibold text-amber-700 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Clock size={16} className="animate-pulse" />
+                        Pending Transactions ({groupedNotes.pending.length})
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {groupedNotes.pending.map(note => (
+                          <NoteCard 
+                            key={note.id} 
+                            note={note} 
+                            onTogglePin={togglePin}
+                            onEdit={(n) => navigate(`/edit/${n.id}`)}
+                            onDelete={(id) => confirmDelete(id)}
+                            formatDate={formatDate}
+                            onOpen={(n) => navigate(`/notes/${n.id}`)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Failed Notes */}
+                  {groupedNotes.failed.length > 0 && (
+                    <div className="mb-8">
+                      <h2 className="text-sm font-semibold text-red-700 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <AlertCircle size={16} />
+                        Failed Transactions ({groupedNotes.failed.length})
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {groupedNotes.failed.map(note => (
+                          <NoteCard 
+                            key={note.id} 
+                            note={note} 
+                            onTogglePin={togglePin}
+                            onEdit={(n) => navigate(`/edit/${n.id}`)}
+                            onDelete={(id) => confirmDelete(id)}
+                            formatDate={formatDate}
+                            onOpen={(n) => navigate(`/notes/${n.id}`)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Confirmed Notes */}
+                  {groupedNotes.confirmed.length > 0 && (
+                    <div className="mb-8">
+                      <h2 className="text-sm font-semibold text-green-700 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <CheckCircle size={16} />
+                        Confirmed on Blockchain ({groupedNotes.confirmed.length})
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {groupedNotes.confirmed.map(note => (
+                          <NoteCard 
+                            key={note.id} 
+                            note={note} 
+                            onTogglePin={togglePin}
+                            onEdit={(n) => navigate(`/edit/${n.id}`)}
+                            onDelete={(id) => confirmDelete(id)}
+                            formatDate={formatDate}
+                            onOpen={(n) => navigate(`/notes/${n.id}`)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other Notes (no blockchain status) */}
+                  {groupedNotes.other.length > 0 && (
+                    <div>
+                      <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
+                        {activeCategory === 'All Notes' ? 'Other Notes' : activeCategory}
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {groupedNotes.other.map(note => (
+                          <NoteCard 
+                            key={note.id} 
+                            note={note} 
+                            onTogglePin={togglePin}
+                            onEdit={(n) => navigate(`/edit/${n.id}`)}
+                            onDelete={(id) => confirmDelete(id)}
+                            formatDate={formatDate}
+                            onOpen={(n) => navigate(`/notes/${n.id}`)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Filtered view (single status selected)
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
+                    {statusFilter} Notes ({filteredNotes.length})
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredNotes.map(note => (
+                      <NoteCard 
+                        key={note.id} 
+                        note={note} 
+                        onTogglePin={togglePin}
+                        onEdit={(n) => navigate(`/edit/${n.id}`)}
+                        onDelete={(id) => confirmDelete(id)}
+                        formatDate={formatDate}
+                        onOpen={(n) => navigate(`/notes/${n.id}`)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

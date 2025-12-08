@@ -1,20 +1,32 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNotes } from '../context/NotesContext';
-import { ArrowLeft, Edit, Trash2, Star, Calendar, Clock, CheckCircle, AlertCircle, History } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Star, Calendar, Clock, CheckCircle, AlertCircle, History, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import TransactionHistoryModal from '../Components/TransactionHistoryModal';
 import DeleteConfirmationModal from '../Components/DeleteConfirmationModal';
 
 function NoteView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getNoteById, deleteNote, togglePin, loading, error, getNoteBlockchainStatus } = useNotes();
+  const { 
+    getNoteById, 
+    deleteNote, 
+    togglePin, 
+    loading, 
+    error, 
+    getNoteBlockchainStatus,
+    getTransactionStatus,
+    retryFailedTransaction 
+  } = useNotes();
   const [note, setNote] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loadingNote, setLoadingNote] = useState(true);
   const [loadingError, setLoadingError] = useState(null);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
   const [blockchainStatus, setBlockchainStatus] = useState("none");
+  const [transactionData, setTransactionData] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -35,6 +47,12 @@ function NoteView() {
         // Get blockchain status
         const status = await getNoteBlockchainStatus(fetchedNote.id);
         setBlockchainStatus(status);
+        
+        // Get transaction data if note has a transaction
+        if (fetchedNote.id) {
+          const txData = await getTransactionStatus(fetchedNote.id);
+          setTransactionData(txData);
+        }
       } else {
         setLoadingError("Could not find the requested note");
       }
@@ -43,7 +61,34 @@ function NoteView() {
     };
 
     fetchNote();
-  }, [id, getNoteById]);
+  }, [id, getNoteById, getTransactionStatus, getNoteBlockchainStatus]);
+
+  // Auto-refresh for pending transactions
+  useEffect(() => {
+    let intervalId;
+    
+    if (blockchainStatus === 'pending' && note?.id) {
+      intervalId = setInterval(async () => {
+        const txData = await getTransactionStatus(note.id);
+        setTransactionData(txData);
+        
+        if (txData?.status === 'CONFIRMED' || txData?.status === 'FAILED') {
+          const status = await getNoteBlockchainStatus(note.id);
+          setBlockchainStatus(status);
+          
+          // Refresh the note to get updated data
+          const updatedNote = await getNoteById(id);
+          if (updatedNote) {
+            setNote(updatedNote);
+          }
+        }
+      }, 10000); // Poll every 10 seconds
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [blockchainStatus, note?.id, getTransactionStatus, getNoteBlockchainStatus, getNoteById, id]);
 
   const handleDelete = async () => {
     const success = await deleteNote(id);
@@ -70,6 +115,48 @@ function NoteView() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleCopyTxHash = async (txHash) => {
+    try {
+      await navigator.clipboard.writeText(txHash);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleRetryTransaction = async () => {
+    if (!note?.id) return;
+    
+    setIsRetrying(true);
+    try {
+      const result = await retryFailedTransaction(note.id);
+      
+      if (result.success) {
+        // Refresh transaction data
+        const txData = await getTransactionStatus(note.id);
+        setTransactionData(txData);
+        
+        const status = await getNoteBlockchainStatus(note.id);
+        setBlockchainStatus(status);
+        
+        // Refresh the note
+        const updatedNote = await getNoteById(id);
+        if (updatedNote) {
+          setNote(updatedNote);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to retry transaction:', err);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const getTxExplorerUrl = (txHash) => {
+    return `https://preview.cardanoscan.io/transaction/${txHash}`;
   };
 
   if (loadingNote || loading) {
@@ -193,6 +280,118 @@ function NoteView() {
               <Calendar size={16} className="mr-1" />
               <span>{formatDate(note.updatedAt || note.createdAt)}</span>
             </div>
+
+            {/* Transaction Details Section */}
+            {(note.txHash || note.latestTxHash || transactionData) && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Transaction Details</h3>
+                
+                {/* Transaction Hash */}
+                {(note.txHash || note.latestTxHash || transactionData?.txHash) && (
+                  <div className="mb-3">
+                    <label className="text-xs text-gray-600 block mb-1">Transaction Hash</label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs bg-white px-3 py-2 rounded border border-gray-300 font-mono break-all">
+                        {note.latestTxHash || note.txHash || transactionData?.txHash}
+                      </code>
+                      <button
+                        onClick={() => handleCopyTxHash(note.latestTxHash || note.txHash || transactionData?.txHash)}
+                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-white rounded transition-colors"
+                        title="Copy transaction hash"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <a
+                        href={getTxExplorerUrl(note.latestTxHash || note.txHash || transactionData?.txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-white rounded transition-colors"
+                        title="View on Cardano Explorer"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
+                    </div>
+                    {copySuccess && (
+                      <span className="text-xs text-green-600 mt-1 block">Copied to clipboard!</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Transaction Status with Actions */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs text-gray-600 block mb-1">Status</label>
+                    <div className="flex items-center gap-2">
+                      {blockchainStatus === 'pending' && (
+                        <span className="flex items-center gap-1 text-sm text-amber-700">
+                          <Clock size={14} className="animate-pulse" />
+                          Pending Confirmation
+                          <span className="text-xs text-gray-500 ml-1">(Auto-refreshing...)</span>
+                        </span>
+                      )}
+                      {blockchainStatus === 'confirmed' && (
+                        <span className="flex items-center gap-1 text-sm text-green-700">
+                          <CheckCircle size={14} />
+                          Confirmed on Blockchain
+                        </span>
+                      )}
+                      {blockchainStatus === 'failed' && (
+                        <span className="flex items-center gap-1 text-sm text-red-700">
+                          <AlertCircle size={14} />
+                          Transaction Failed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    {blockchainStatus === 'failed' && (
+                      <button
+                        onClick={handleRetryTransaction}
+                        disabled={isRetrying}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <RefreshCw size={14} className={isRetrying ? 'animate-spin' : ''} />
+                        {isRetrying ? 'Retrying...' : 'Retry Transaction'}
+                      </button>
+                    )}
+                    
+                    <button
+                      onClick={() => setShowTransactionHistory(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+                    >
+                      <History size={14} />
+                      View History
+                    </button>
+                  </div>
+                </div>
+
+                {/* Additional Transaction Info */}
+                {transactionData && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2 text-xs">
+                    {transactionData.blockHeight && (
+                      <div>
+                        <span className="text-gray-600">Block Height:</span>
+                        <span className="ml-1 font-mono">{transactionData.blockHeight}</span>
+                      </div>
+                    )}
+                    {transactionData.confirmedAt && (
+                      <div>
+                        <span className="text-gray-600">Confirmed:</span>
+                        <span className="ml-1">{formatDate(transactionData.confirmedAt)}</span>
+                      </div>
+                    )}
+                    {transactionData.retryCount > 0 && (
+                      <div>
+                        <span className="text-gray-600">Retry Count:</span>
+                        <span className="ml-1">{transactionData.retryCount}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             
             <div className="prose prose-lg max-w-none">
               {note.content.split('\n').map((paragraph, idx) => (
