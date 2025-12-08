@@ -714,7 +714,7 @@ export const NotesProvider = ({ children }) => {
   const refreshNotes = useCallback(async () => {
     try {
       console.log('🔄 Refreshing notes from backend...');
-      const response = await axios.get(API_URL);
+      const response = await axios.get(`${API_URL}`);
       console.log('✅ Notes refreshed, total:', response.data.length);
       
       // Log status breakdown

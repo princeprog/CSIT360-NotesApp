@@ -95,7 +95,8 @@ export const useStatusPolling = (interval = 10000) => {
     isCheckingRef.current = true;
     
     try {
-      console.log('🔄 Polling: Checking pending transactions...');
+      console.log('🔄 Polling: Checking pending transactions...', new Date().toLocaleTimeString());
+      console.log('⏰ Polling interval: Every 10 seconds');
       
       // Get fresh data from backend - use ref to get latest function
       const freshNotes = await refreshNotesRef.current();

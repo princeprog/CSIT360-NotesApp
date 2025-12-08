@@ -62,6 +62,13 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
     List<Note> findByWalletAddress(String walletAddress);
 
     /**
+     * Find all notes by wallet address ordered by creation date (newest first)
+     * @param walletAddress The wallet address
+     * @return List of notes for the wallet ordered by createdAt DESC
+     */
+    List<Note> findByWalletAddressOrderByCreatedAtDesc(String walletAddress);
+
+    /**
      * Find notes by status and wallet address
      * @param status The note status
      * @param walletAddress The wallet address

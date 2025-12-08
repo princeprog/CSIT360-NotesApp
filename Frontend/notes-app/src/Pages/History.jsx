@@ -7,12 +7,22 @@ import { useWallet } from "../context/WalletContext";
 import { getStatusColor, getStatusText, getExplorerUrl } from "../config/blockchain";
 import WalletConnect from "../Components/WalletConnect";
 import TransactionHistoryModal from "../Components/TransactionHistoryModal";
+import useStatusPolling from "../hooks/useStatusPolling";
+import TransactionNotifications from "../Components/TransactionNotifications";
 
 function History() {
   const navigate = useNavigate();
   const { notes, history } = useNotes();
   const { walletAddress } = useWallet();
   const [transactionHistory, setTransactionHistory] = useState([]);
+  
+  // Initialize status polling hook
+  const { 
+    isPolling, 
+    pendingCount, 
+    notifications, 
+    dismissNotification 
+  } = useStatusPolling();
   
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -57,15 +67,29 @@ function History() {
     }
   }, [notes]);
   
-  // Fetch transaction history from backend and merge with local delete transactions
+  // Refetch transaction history when a transaction is confirmed (notification appears)
   useEffect(() => {
-    const fetchTransactionHistory = async () => {
-      if (!walletAddress) return;
+    if (notifications.length > 0 && walletAddress) {
+      console.log('🔔 History: Transaction confirmed notification received - refetching history...');
+      // Wait a moment for the backend to update
+      const timer = setTimeout(() => {
+        console.log('🔄 History: Refetching transaction history after confirmation...');
+        fetchTransactionHistory();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [notifications.length, walletAddress]);
+  
+  // Fetch transaction history from backend and merge with local delete transactions
+  const fetchTransactionHistory = async () => {
+    if (!walletAddress) return;
       
       try {
-        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+        console.log('📜 History: Fetching transaction history for wallet:', walletAddress.substring(0, 20) + '...');
+        const apiUrl = 'http://localhost:8080/api';
         const response = await axios.get(`${apiUrl}/transactions/wallet/${walletAddress}`);
         const apiTransactions = response.data.content || response.data || [];
+        console.log('✅ History: Fetched', apiTransactions.length, 'transactions from API');
         
         // Get delete transactions from localStorage
         const localDeletes = JSON.parse(localStorage.getItem('deleteTransactions') || '[]');
@@ -107,7 +131,16 @@ function History() {
           return dateB - dateA;
         });
         
+        // Log status breakdown
+        const statusBreakdown = allTransactions.reduce((acc, tx) => {
+          const status = (tx.status || 'UNKNOWN').toUpperCase();
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('📊 History: Transaction status breakdown:', statusBreakdown);
+        
         setTransactionHistory(allTransactions);
+        console.log('✅ History: Transaction history updated with', allTransactions.length, 'total transactions');
       } catch (err) {
         console.error("Failed to fetch transaction history:", err);
         
@@ -117,9 +150,35 @@ function History() {
         setTransactionHistory(walletDeletes);
       }
     };
-    
+  
+  // Initial fetch on mount and when wallet changes
+  useEffect(() => {
     fetchTransactionHistory();
   }, [walletAddress]);
+  
+  // Poll for updates when there are pending transactions in history
+  useEffect(() => {
+    const pendingTransactions = transactionHistory.filter(tx => 
+      (tx.status || '').toLowerCase() === 'pending'
+    );
+    
+    if (pendingTransactions.length > 0) {
+      console.log(`📌 History: ${pendingTransactions.length} pending transaction(s) in history - starting polling`);
+      
+      // Poll every 10 seconds
+      const pollInterval = setInterval(() => {
+        console.log('🔄 History: Polling for transaction updates...', new Date().toLocaleTimeString());
+        fetchTransactionHistory();
+      }, 10000); // 10 seconds
+      
+      return () => {
+        console.log('⏸️ History: Stopping transaction history polling');
+        clearInterval(pollInterval);
+      };
+    } else {
+      console.log('✅ History: No pending transactions - polling not needed');
+    }
+  }, [transactionHistory]);
   
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -335,7 +394,7 @@ function History() {
     
     // If not found, try to fetch from API
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const apiUrl = 'http://localhost:8080/api';
       const response = await axios.get(`${apiUrl}/notes/${tx.noteId}`);
       setNoteContent(response.data);
     } catch (err) {
@@ -499,6 +558,23 @@ function History() {
               View Full History
             </button>
           </div>
+          
+          {/* Polling Status Indicator */}
+          {isPolling && pendingCount > 0 && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3">
+              <div className="relative">
+                <Clock size={20} className="text-blue-600 animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-900">
+                  Monitoring {pendingCount} pending transaction{pendingCount !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-blue-600">
+                  Automatically checking for confirmations...
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* Statistics Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -946,6 +1022,12 @@ function History() {
           action: tx.operation || tx.action,
           timestamp: tx.createdAt || tx.timestamp
         }))}
+      />
+      
+      {/* Transaction Notifications */}
+      <TransactionNotifications 
+        notifications={notifications} 
+        onDismiss={dismissNotification} 
       />
     </div>
   );

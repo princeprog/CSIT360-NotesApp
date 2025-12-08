@@ -15,6 +15,7 @@ import DeleteConfirmationModal from "../Components/DeleteConfirmationModal";
 import WalletConnect from "../Components/WalletConnect";
 import TransactionProgress from "../Components/TransactionProgress";
 import TransactionNotifications from "../Components/TransactionNotifications";
+import Toast from "../Components/Toast";
 import { useNotes } from "../context/NotesContext";
 import { useWallet } from "../context/WalletContext";
 import useStatusPolling from "../hooks/useStatusPolling";
@@ -36,7 +37,7 @@ function Home() {
     currentStep,
     currentTxHash,
   } = useNotes();
-  const { walletAddress } = useWallet();
+  const { walletAddress, isConnected } = useWallet();
 
   // Initialize status polling hook
   const { 
@@ -48,6 +49,12 @@ function Home() {
   
   // Transaction history count
   const [transactionCount, setTransactionCount] = useState(0);
+  
+  // Track the newest note ID
+  const [newestNoteId, setNewestNoteId] = useState(null);
+
+  // Toast notification state
+  const [toast, setToast] = useState(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All Notes");
@@ -96,6 +103,17 @@ function Home() {
     if (window.cardano) setWallets(Object.keys(window.cardano));
   }, []);
 
+  // Listen for wallet connection success
+  useEffect(() => {
+    const handleWalletConnected = (event) => {
+      const { message, type } = event.detail;
+      setToast({ message, type });
+    };
+    
+    window.addEventListener('wallet-connected', handleWalletConnected);
+    return () => window.removeEventListener('wallet-connected', handleWalletConnected);
+  }, []);
+
   // Fetch transaction history count
   useEffect(() => {
     const fetchTransactionCount = async () => {
@@ -105,7 +123,7 @@ function Home() {
       }
       
       try {
-        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+        const apiUrl = 'http://localhost:8080/api';
         const response = await axios.get(`${apiUrl}/transactions/wallet/${walletAddress}`);
         const transactions = response.data.content || response.data || [];
         setTransactionCount(transactions.length);
@@ -122,6 +140,17 @@ function Home() {
     if (notes && notes.length > 0) {
       const uniqueCategories = [...new Set(notes.map((note) => note.category))];
       setCategories(["All Notes", ...uniqueCategories]);
+      
+      // Find the most recently created note (highest ID)
+      const sortedByCreation = [...notes].sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
+      
+      if (sortedByCreation.length > 0) {
+        setNewestNoteId(sortedByCreation[0].id);
+      }
     }
   }, [notes]);
 
@@ -156,6 +185,13 @@ function Home() {
     });
 
   const openCreateModal = () => {
+    if (!isConnected) {
+      setToast({
+        message: "Please connect your wallet before creating a note.",
+        type: "warning"
+      });
+      return;
+    }
     setEditingNote(null);
     setIsModalOpen(true);
   };
@@ -425,6 +461,7 @@ function Home() {
                             onEdit={openEditModal}
                             onDelete={confirmDelete}
                             formatDate={formatDate}
+                            isNewest={note.id === newestNoteId}
                           />
                         ))}
                       </div>
@@ -444,6 +481,7 @@ function Home() {
                           onEdit={openEditModal}
                           onDelete={confirmDelete}
                           formatDate={formatDate}
+                          isNewest={note.id === newestNoteId}
                         />
                       ))}
                     </div>
@@ -486,6 +524,15 @@ function Home() {
         notifications={notifications}
         onDismiss={dismissNotification}
       />
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

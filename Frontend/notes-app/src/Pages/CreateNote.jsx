@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../context/NotesContext';
 import { ArrowLeft } from 'lucide-react';
+import TransactionProgress from '../Components/TransactionProgress';
 
 function CreateNote() {
   const navigate = useNavigate();
-  const { createNote } = useNotes();
+  const { createNote, currentStep, currentTxHash } = useNotes();
   
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     category: 'Personal'
   });
-  const [categories] = useState(['Personal', 'Work', 'Study']);
+  const [categories] = useState(['Personal', 'Work', 'Study', 'Ideas', 'Important', 'Archive']);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -162,6 +163,12 @@ function CreateNote() {
           </div>
         </div>
       </div>
+
+      {/* Transaction Progress Overlay */}
+      <TransactionProgress 
+        currentStep={currentStep} 
+        txHash={currentTxHash} 
+      />
     </div>
   );
 }

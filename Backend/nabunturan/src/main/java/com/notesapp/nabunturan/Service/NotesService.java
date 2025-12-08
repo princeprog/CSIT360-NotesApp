@@ -149,15 +149,15 @@ public class NotesService {
     }
 
     /**
-     * Get all notes filtered by wallet address
+     * Get all notes filtered by wallet address, ordered by creation date (newest first)
      * @param walletAddress Wallet address to filter by (optional)
-     * @return List of notes
+     * @return List of notes ordered by createdAt DESC
      */
     public List<Note> getAllNotes(String walletAddress) {
         if (walletAddress != null && !walletAddress.isEmpty()) {
-            return noteRepository.findByWalletAddress(walletAddress);
+            return noteRepository.findByWalletAddressOrderByCreatedAtDesc(walletAddress);
         }
-        return noteRepository.findAll();
+        return noteRepository.findAllByOrderByCreatedAtDesc();
     }
 
     /**

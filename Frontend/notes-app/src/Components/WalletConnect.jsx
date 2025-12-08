@@ -272,6 +272,14 @@ export default function WalletConnect() {
           const address = await api.getChangeAddress();
           setLocalWalletAddress(address);
           console.log("Wallet address:", address);
+          
+          // Emit success toast event
+          window.dispatchEvent(new CustomEvent('wallet-connected', {
+            detail: {
+              message: `${localSelectedWallet.charAt(0).toUpperCase() + localSelectedWallet.slice(1)} wallet connected successfully!`,
+              type: 'success'
+            }
+          }));
         } catch (innerErr) {
           console.warn("Unable to get change address from provider:", innerErr);
         }
