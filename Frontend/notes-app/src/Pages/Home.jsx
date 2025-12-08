@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -15,9 +16,12 @@ import WalletConnect from "../Components/WalletConnect";
 import TransactionProgress from "../Components/TransactionProgress";
 import TransactionNotifications from "../Components/TransactionNotifications";
 import { useNotes } from "../context/NotesContext";
+import { useWallet } from "../context/WalletContext";
 import useStatusPolling from "../hooks/useStatusPolling";
+import axios from "axios";
 
 function Home() {
+  const navigate = useNavigate();
   const {
     notes,
     loading,
@@ -32,6 +36,7 @@ function Home() {
     currentStep,
     currentTxHash,
   } = useNotes();
+  const { walletAddress } = useWallet();
 
   // Initialize status polling hook
   const { 
@@ -40,6 +45,9 @@ function Home() {
     notifications, 
     dismissNotification 
   } = useStatusPolling();
+  
+  // Transaction history count
+  const [transactionCount, setTransactionCount] = useState(0);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All Notes");
@@ -87,6 +95,28 @@ function Home() {
   useEffect(() => {
     if (window.cardano) setWallets(Object.keys(window.cardano));
   }, []);
+
+  // Fetch transaction history count
+  useEffect(() => {
+    const fetchTransactionCount = async () => {
+      if (!walletAddress) {
+        setTransactionCount(0);
+        return;
+      }
+      
+      try {
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+        const response = await axios.get(`${apiUrl}/transactions/wallet/${walletAddress}`);
+        const transactions = response.data.content || response.data || [];
+        setTransactionCount(transactions.length);
+      } catch (err) {
+        console.error("Failed to fetch transaction count:", err);
+        setTransactionCount(0);
+      }
+    };
+    
+    fetchTransactionCount();
+  }, [walletAddress]);
 
   useEffect(() => {
     if (notes && notes.length > 0) {
@@ -222,13 +252,11 @@ function Home() {
               Navigation
             </h3>
             <div className="space-y-1">
-              {["All Notes", "History", ...categories.filter(c => c !== "All Notes")].map(
+              {["All Notes", ...categories.filter(c => c !== "All Notes")].map(
                 (category) => {
                   const count =
                     category === "All Notes"
                       ? notes.length
-                      : category === "History"
-                      ? history.length
                       : notes.filter((note) => note.category === category).length;
                   const isActive = activeCategory === category;
                   
@@ -266,6 +294,21 @@ function Home() {
                   );
                 }
               )}
+              {/* History Navigation Button */}
+              <button
+                onClick={() => {
+                  navigate('/history');
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                className="group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+              >
+                <span className="text-sm font-medium">History</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors bg-slate-200 text-slate-600 group-hover:bg-slate-300">
+                    {transactionCount}
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -334,40 +377,6 @@ function Home() {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {/* History Section */}
-          {activeCategory === "History" && (
-            <div className="mb-6 max-w-6xl mx-auto">
-              <h2 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
-                Recent Activity
-              </h2>
-              {history.length === 0 ? (
-                <p className="text-gray-500">No history yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {history.slice(0, 10).map((entry, index) => (
-                    <div
-                      key={index}
-                      className="px-4 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 flex justify-between"
-                    >
-                      <div>
-                        <span className="font-semibold">{entry.action}</span> "{entry.noteTitle}"
-                      </div>
-                      <div className="text-gray-400">
-                        {new Date(entry.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Notes Section */}
-          {activeCategory !== "History" && (
-            <>
               {loading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -441,8 +450,6 @@ function Home() {
                   </div>
                 </div>
               )}
-            </>
-          )}
         </div>
       </div>
 

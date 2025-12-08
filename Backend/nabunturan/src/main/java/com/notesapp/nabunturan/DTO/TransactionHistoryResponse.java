@@ -118,18 +118,55 @@ public class TransactionHistoryResponse {
     private static String determineOperationType(Transaction transaction) {
         // Try to determine from metadata
         String metadata = transaction.getMetadataJson();
-        if (metadata != null) {
-            if (metadata.contains("\"operation\":\"CREATE\"") || metadata.contains("\"type\":\"CREATE\"")) {
-                return "CREATE";
-            } else if (metadata.contains("\"operation\":\"UPDATE\"") || metadata.contains("\"type\":\"UPDATE\"")) {
-                return "UPDATE";
-            } else if (metadata.contains("\"operation\":\"DELETE\"") || metadata.contains("\"type\":\"DELETE\"")) {
-                return "DELETE";
+        if (metadata != null && !metadata.isEmpty()) {
+            // Normalize metadata to uppercase for case-insensitive matching
+            String metadataUpper = metadata.toUpperCase();
+            
+            // Check for various formats of operation field
+            // Format 1: "operation":"CREATE" or "operation": "CREATE"
+            // Format 2: "type":"CREATE" or "type": "CREATE"
+            if (metadataUpper.contains("\"OPERATION\"") || metadataUpper.contains("\"TYPE\"")) {
+                if (metadataUpper.contains("\"CREATE\"") || metadataUpper.contains(":\"CREATE\"") || 
+                    metadataUpper.contains(": \"CREATE\"")) {
+                    return "CREATE";
+                } else if (metadataUpper.contains("\"UPDATE\"") || metadataUpper.contains(":\"UPDATE\"") || 
+                           metadataUpper.contains(": \"UPDATE\"")) {
+                    return "UPDATE";
+                } else if (metadataUpper.contains("\"DELETE\"") || metadataUpper.contains(":\"DELETE\"") || 
+                           metadataUpper.contains(": \"DELETE\"")) {
+                    return "DELETE";
+                }
+            }
+            
+            // Try to parse JSON properly using simple string extraction
+            try {
+                // Look for "operation":"VALUE" pattern
+                int opIndex = metadata.toLowerCase().indexOf("\"operation\"");
+                if (opIndex != -1) {
+                    // Find the value after the colon
+                    int colonIndex = metadata.indexOf(":", opIndex);
+                    if (colonIndex != -1) {
+                        // Find the opening quote of the value
+                        int valueStart = metadata.indexOf("\"", colonIndex + 1);
+                        if (valueStart != -1) {
+                            // Find the closing quote
+                            int valueEnd = metadata.indexOf("\"", valueStart + 1);
+                            if (valueEnd != -1) {
+                                String operationValue = metadata.substring(valueStart + 1, valueEnd).toUpperCase();
+                                if ("CREATE".equals(operationValue) || "UPDATE".equals(operationValue) || "DELETE".equals(operationValue)) {
+                                    return operationValue;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore parsing errors
             }
         }
         
-        // Default to UPDATE if can't determine
-        return "UPDATE";
+        // Default to UNKNOWN if can't determine
+        return "UNKNOWN";
     }
 
     /**

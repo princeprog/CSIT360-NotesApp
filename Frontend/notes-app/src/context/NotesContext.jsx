@@ -617,6 +617,26 @@ export const NotesProvider = ({ children }) => {
         throw new Error('Missing required fields: txHash, walletAddress, or metadataJson');
       }
       
+      // Save delete transaction to localStorage before backend delete
+      // (because backend cascades delete and removes the transaction record)
+      const deleteTransaction = {
+        id: `delete-${id}-${Date.now()}`,
+        noteId: id,
+        noteTitle: existingNote.title,
+        txHash: txHash,
+        status: 'PENDING',
+        walletAddress: walletAddress,
+        operationType: 'DELETE',
+        metadataJson: metadataJson,
+        createdAt: new Date().toISOString(),
+        isLocalDelete: true
+      };
+      
+      // Get existing delete transactions from localStorage
+      const existingDeletes = JSON.parse(localStorage.getItem('deleteTransactions') || '[]');
+      existingDeletes.push(deleteTransaction);
+      localStorage.setItem('deleteTransactions', JSON.stringify(existingDeletes));
+      
       await axios.delete(`${API_URL}/${id}`, {
         data: {
           txHash: txHash,
