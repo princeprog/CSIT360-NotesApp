@@ -21,6 +21,9 @@ import { useWallet } from "../context/WalletContext";
 import useStatusPolling from "../hooks/useStatusPolling";
 import axios from "axios";
 
+// Default categories that should always be available
+const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Study', 'Ideas', 'Important', 'Archive'];
+
 function Home() {
   const navigate = useNavigate();
   const {
@@ -137,11 +140,18 @@ function Home() {
   }, [walletAddress]);
 
   useEffect(() => {
+    // Always update categories based on notes, even if empty
+    const uniqueCategories = notes && notes.length > 0
+      ? [...new Set(notes.map((note) => note.category).filter(Boolean))] // Filter out null/undefined/empty
+      : [];
+    
+    // Combine default categories with unique categories from notes
+    // Remove duplicates and sort
+    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...uniqueCategories])].sort();
+    setCategories(["All Notes", ...allCategories]);
+    
+    // Find the most recently created note (highest ID)
     if (notes && notes.length > 0) {
-      const uniqueCategories = [...new Set(notes.map((note) => note.category))];
-      setCategories(["All Notes", ...uniqueCategories]);
-      
-      // Find the most recently created note (highest ID)
       const sortedByCreation = [...notes].sort((a, b) => {
         const dateA = new Date(a.createdAt || 0).getTime();
         const dateB = new Date(b.createdAt || 0).getTime();
@@ -499,7 +509,7 @@ function Home() {
           editingNote || {
             title: "",
             content: "",
-            category: categories.length > 1 ? categories[1] : "",
+            category: categories.length > 1 ? categories[1] : "Personal",
           }
         }
         categories={categories.filter((cat) => cat !== "All Notes")}
@@ -538,3 +548,4 @@ function Home() {
 }
 
 export default Home;
+
