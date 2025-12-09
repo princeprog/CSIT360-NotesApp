@@ -108,7 +108,6 @@ export const NotesProvider = ({ children }) => {
       
       setCurrentStep(2); // Step 2: Connecting to blockchain
       
-      // Step 1: Build and submit blockchain transaction FIRST
       const projectId = import.meta.env.VITE_BLOCKFROST_PROJECT_ID;
       if (projectId) {
         try {
@@ -116,7 +115,6 @@ export const NotesProvider = ({ children }) => {
           console.log('📍 Network:', BLOCKCHAIN_CONFIG.NETWORK);
           console.log('🔑 Project ID:', projectId.substring(0, 10) + '...');
           
-          // Blockfrost expects format 'cardano-preview', not just 'preview'
           const networkName = BLOCKCHAIN_CONFIG.NETWORK.startsWith('cardano-') 
             ? BLOCKCHAIN_CONFIG.NETWORK 
             : `cardano-${BLOCKCHAIN_CONFIG.NETWORK}`;
@@ -152,23 +150,16 @@ export const NotesProvider = ({ children }) => {
             isPinned: false
           }, TRANSACTION_OPERATIONS.CREATE);
           
-          // Validate chunks
           validateChunkedMetadata(chunkedMetadata);
           metadataJson = JSON.stringify(chunkedMetadata);
 
-          // --- METADATA CONSTRUCTION FOR BLOCKCHAIN TRANSACTION ---
-          // STEP 1: INITIALIZE THE TOP-LEVEL CONTAINER
           const metadata = new Map();
           const label = BLOCKCHAIN_CONFIG.METADATA_LABEL;
 
-          // STEP 2: CREATE THE INNER DATA STRUCTURE (MetadatumMap)
           const metadatumMap = new Core.MetadatumMap();
 
-          // STEP 3: INSERT KEY-VALUE PAIRS
           
-          // Helper to format content (handles both strings and arrays)
           const formatContent = (content) => {
-            // If content is already chunked (array), create a list
             if (Array.isArray(content)) {
               const list = new Core.MetadatumList();
               content.forEach(chunk => {
@@ -176,11 +167,9 @@ export const NotesProvider = ({ children }) => {
               });
               return Core.Metadatum.newList(list);
             }
-            // If content is a string, use it directly
             return Core.Metadatum.newText(content || "");
           };
 
-          // ACTION
           metadatumMap.insert(
             Core.Metadatum.newText("action"),
             Core.Metadatum.newText(TRANSACTION_OPERATIONS.CREATE)
@@ -526,7 +515,14 @@ export const NotesProvider = ({ children }) => {
         const blaze = await Blaze.from(provider, wallet);
 
             // Build chunked metadata for backend storage
-            const chunkedMetadata = chunkMetadata(existingNote, TRANSACTION_OPERATIONS.DELETE);
+            const chunkedMetadata = chunkMetadata({
+              id: existingNote.id,
+              title: existingNote.title,
+              content: existingNote.content || '',
+              category: existingNote.category,
+              isPinned: existingNote.isPinned || false
+            }, TRANSACTION_OPERATIONS.DELETE);
+            
             validateChunkedMetadata(chunkedMetadata);
             metadataJson = JSON.stringify(chunkedMetadata);
 
@@ -565,6 +561,11 @@ export const NotesProvider = ({ children }) => {
             metadatumMap.insert(
               Core.Metadatum.newText("title"),
               formatContent(chunkedMetadata.title)
+            );
+
+            metadatumMap.insert(
+              Core.Metadatum.newText("content"),
+              formatContent(chunkedMetadata.content)
             );
 
             // CATEGORY (use chunked version)

@@ -295,7 +295,7 @@ function Home() {
           {/* Categories */}
           <div className="mb-6">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-3">
-              Navigation
+              Categories
             </h3>
             <div className="space-y-1">
               {["All Notes", ...categories.filter(c => c !== "All Notes")].map(
@@ -340,19 +340,46 @@ function Home() {
                   );
                 }
               )}
-              {/* History Navigation Button */}
+            </div>
+          </div>
+
+          {/* Blockchain Section */}
+          <div className="mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-3">
+              Blockchain
+            </h3>
+            <div className="space-y-1">
               <button
                 onClick={() => {
                   navigate('/history');
                   if (isMobile) setSidebarOpen(false);
                 }}
-                className="group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                className="group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 text-slate-700 hover:text-emerald-700 border border-transparent hover:border-emerald-200"
               >
-                <span className="text-sm font-medium">History</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="w-4 h-4 text-white" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                  </div>
+                  <span className="text-sm font-semibold">Transaction History</span>
+                </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors bg-slate-200 text-slate-600 group-hover:bg-slate-300">
-                    {transactionCount}
-                  </span>
+                  {transactionCount > 0 && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200">
+                      {transactionCount}
+                    </span>
+                  )}
+                  <ChevronRight size={16} className="text-slate-400 group-hover:text-emerald-600" strokeWidth={2.5} />
                 </div>
               </button>
             </div>
@@ -363,7 +390,7 @@ function Home() {
         <div className="mt-auto border-t border-slate-200 bg-gradient-to-br from-slate-50 to-white">
           <div className="p-4">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-2">
-              Blockchain
+              Wallet Connection
             </h3>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
               <WalletConnect />

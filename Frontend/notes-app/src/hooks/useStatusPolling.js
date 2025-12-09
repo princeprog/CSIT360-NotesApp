@@ -1,13 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNotes } from '../context/NotesContext';
 
-/**
- * Custom hook for polling transaction status
- * Automatically checks pending notes and updates when confirmed
- * 
- * @param {number} interval - Polling interval in milliseconds (default: 10000 = 10 seconds)
- * @returns {object} - Polling state and controls
- */
+
 export const useStatusPolling = (interval = 10000) => {
   const [isPolling, setIsPolling] = useState(false);
   const [lastChecked, setLastChecked] = useState(null);
@@ -27,9 +21,7 @@ export const useStatusPolling = (interval = 10000) => {
     refreshNotesRef.current = refreshNotes;
   }, [refreshNotes]);
 
-  /**
-   * Add notification
-   */
+
   const addNotification = useCallback((notification) => {
     setNotifications(prev => {
       // Avoid duplicate notifications

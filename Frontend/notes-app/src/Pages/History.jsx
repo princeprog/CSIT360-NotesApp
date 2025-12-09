@@ -468,7 +468,7 @@ function History() {
         <div className="px-4 py-6">
           <div className="mb-6">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-3">
-              Navigation
+              Categories
             </h3>
             <div className="space-y-1">
               {["All Notes", ...categories.filter(c => c !== "All Notes")].map(
@@ -477,6 +477,7 @@ function History() {
                     category === "All Notes"
                       ? notes.length
                       : notes.filter((note) => note.category === category).length;
+                  const isActive = false; // Never active on history page
                   
                   return (
                     <button
@@ -485,29 +486,68 @@ function History() {
                         navigate('/notes');
                         if (isMobile) setSidebarOpen(false);
                       }}
-                      className="group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                      className={`group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20"
+                          : "hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                      }`}
                     >
-                      <span className="text-sm font-medium">
+                      <span className={`text-sm font-medium ${isActive ? 'font-semibold' : ''}`}>
                         {category}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors bg-slate-200 text-slate-600 group-hover:bg-slate-300">
+                        <span
+                          className={`text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-slate-200 text-slate-600 group-hover:bg-slate-300"
+                          }`}
+                        >
                           {count}
                         </span>
+                        {isActive && (
+                          <ChevronRight size={16} className="text-white" strokeWidth={2.5} />
+                        )}
                       </div>
                     </button>
                   );
                 }
               )}
-              {/* History Navigation Button - Active */}
+            </div>
+          </div>
+
+          {/* Blockchain Section */}
+          <div className="mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-3">
+              Blockchain
+            </h3>
+            <div className="space-y-1">
               <button
-                className="group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20"
+                className="group w-full text-left py-2.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20"
               >
-                <span className="text-sm font-semibold">History</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shadow-sm">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="w-4 h-4 text-white" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                  </div>
+                  <span className="text-sm font-semibold">Transaction History</span>
+                </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors bg-white/20 text-white">
-                    {transactionHistory.length}
-                  </span>
+                  {transactionHistory.length > 0 && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full font-bold min-w-[24px] text-center transition-colors bg-white/30 text-white">
+                      {transactionHistory.length}
+                    </span>
+                  )}
                   <ChevronRight size={16} className="text-white" strokeWidth={2.5} />
                 </div>
               </button>
@@ -519,7 +559,7 @@ function History() {
         <div className="mt-auto border-t border-slate-200 bg-gradient-to-br from-slate-50 to-white">
           <div className="p-4">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-2">
-              Blockchain
+              Wallet Connection
             </h3>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
               <WalletConnect />
