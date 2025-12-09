@@ -15,13 +15,31 @@ const NoteForm = ({
   // Only initialize form data when modal first opens
   useEffect(() => {
     if (isOpen && !hasInitialized) {
-      setFormData(initialData);
+      // Ensure the category exists in the available categories, otherwise use first available
+      const validCategory = categories.includes(initialData.category) 
+        ? initialData.category 
+        : (categories.length > 0 ? categories[0] : 'Personal');
+      
+      setFormData({
+        ...initialData,
+        category: validCategory
+      });
       setHasInitialized(true);
     }
     if (!isOpen) {
       setHasInitialized(false);
     }
-  }, [isOpen, initialData, hasInitialized]);
+  }, [isOpen, initialData, hasInitialized, categories]);
+
+  // Update category if current selection is no longer in categories list
+  useEffect(() => {
+    if (isOpen && categories.length > 0 && !categories.includes(formData.category)) {
+      setFormData(prev => ({
+        ...prev,
+        category: categories[0]
+      }));
+    }
+  }, [categories, isOpen, formData.category]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
